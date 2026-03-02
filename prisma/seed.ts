@@ -1,13 +1,8 @@
 import "dotenv/config";
 import { PrismaClient } from "../generated/prisma/client.js";
-import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { PrismaPg } from "@prisma/adapter-pg";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const dbPath = path.resolve(__dirname, "../dev.db");
-
-const adapter = new PrismaBetterSqlite3({ url: `file:${dbPath}` });
+const adapter = new PrismaPg({ connectionString: process.env["DATABASE_URL"]! });
 const prisma = new PrismaClient({ adapter });
 
 // ─────────────────────────────────────────────
@@ -64,7 +59,7 @@ async function main() {
       role: "Manager",
       hierarchy_rank: 1,
       management_tier: "MANAGER",
-      specialties: JSON.stringify(["cashier", "inventory", "forklift"]),
+      specialties: ["cashier", "inventory", "forklift"],
       status: "ACTIVE",
     },
   });
@@ -80,7 +75,7 @@ async function main() {
       role: "Manager",
       hierarchy_rank: 2,
       management_tier: "MANAGER",
-      specialties: JSON.stringify(["cashier", "customer_service", "training"]),
+      specialties: ["cashier", "customer_service", "training"],
       status: "ACTIVE",
     },
   });
@@ -97,7 +92,7 @@ async function main() {
       role: "Assistant Manager",
       hierarchy_rank: 3,
       management_tier: "ASSISTANT_MANAGER",
-      specialties: JSON.stringify(["cashier", "customer_service"]),
+      specialties: ["cashier", "customer_service"],
       status: "ACTIVE",
     },
   });
@@ -113,7 +108,7 @@ async function main() {
       role: "Assistant Manager",
       hierarchy_rank: 4,
       management_tier: "ASSISTANT_MANAGER",
-      specialties: JSON.stringify(["cashier", "forklift", "inventory"]),
+      specialties: ["cashier", "forklift", "inventory"],
       status: "ACTIVE",
     },
   });
@@ -129,7 +124,7 @@ async function main() {
       role: "Assistant Manager",
       hierarchy_rank: 5,
       management_tier: "ASSISTANT_MANAGER",
-      specialties: JSON.stringify(["cashier", "training"]),
+      specialties: ["cashier", "training"],
       status: "ACTIVE",
     },
   });
@@ -147,7 +142,7 @@ async function main() {
         role: "Lead",
         hierarchy_rank: 6,
         management_tier: "STAFF",
-        specialties: JSON.stringify(["cashier", "forklift"]),
+        specialties: ["cashier", "forklift"],
         status: "ACTIVE",
       },
     }),
@@ -162,7 +157,7 @@ async function main() {
         role: "Lead",
         hierarchy_rank: 7,
         management_tier: "STAFF",
-        specialties: JSON.stringify(["cashier", "customer_service"]),
+        specialties: ["cashier", "customer_service"],
         status: "ACTIVE",
       },
     }),
@@ -177,7 +172,7 @@ async function main() {
         role: "Associate",
         hierarchy_rank: 8,
         management_tier: "STAFF",
-        specialties: JSON.stringify(["cashier", "inventory"]),
+        specialties: ["cashier", "inventory"],
         status: "ACTIVE",
       },
     }),
@@ -192,7 +187,7 @@ async function main() {
         role: "Associate",
         hierarchy_rank: 9,
         management_tier: "STAFF",
-        specialties: JSON.stringify(["cashier"]),
+        specialties: ["cashier"],
         status: "ACTIVE",
       },
     }),
@@ -207,7 +202,7 @@ async function main() {
         role: "Associate",
         hierarchy_rank: 10,
         management_tier: "STAFF",
-        specialties: JSON.stringify(["cashier", "stocking"]),
+        specialties: ["cashier", "stocking"],
         status: "ACTIVE",
       },
     }),
@@ -222,7 +217,7 @@ async function main() {
         role: "Associate",
         hierarchy_rank: 11,
         management_tier: "STAFF",
-        specialties: JSON.stringify(["stocking", "inventory"]),
+        specialties: ["stocking", "inventory"],
         status: "ACTIVE",
       },
     }),
@@ -237,7 +232,7 @@ async function main() {
         role: "Associate",
         hierarchy_rank: 12,
         management_tier: "STAFF",
-        specialties: JSON.stringify(["cashier"]),
+        specialties: ["cashier"],
         status: "ACTIVE",
       },
     }),
@@ -252,7 +247,7 @@ async function main() {
         role: "Associate",
         hierarchy_rank: 13,
         management_tier: "STAFF",
-        specialties: JSON.stringify(["customer_service", "cashier"]),
+        specialties: ["customer_service", "cashier"],
         status: "ACTIVE",
       },
     }),
@@ -267,7 +262,7 @@ async function main() {
         role: "Associate",
         hierarchy_rank: 14,
         management_tier: "STAFF",
-        specialties: JSON.stringify(["forklift", "stocking"]),
+        specialties: ["forklift", "stocking"],
         status: "ACTIVE",
       },
     }),
@@ -282,7 +277,7 @@ async function main() {
         role: "Associate",
         hierarchy_rank: 15,
         management_tier: "STAFF",
-        specialties: JSON.stringify(["cashier", "customer_service"]),
+        specialties: ["cashier", "customer_service"],
         status: "ACTIVE",
       },
     }),
@@ -433,11 +428,11 @@ async function main() {
       min_rest_hours_between_shifts: 8,
       schedule_period_days: 7,
       conflict_resolution_strategy: "SENIORITY_FIRST",
-      peak_windows: JSON.stringify([
+      peak_windows: [
         { days: ["Friday"], start_time: "18:00", end_time: "02:00" },
         { days: ["Saturday"], start_time: "06:00", end_time: "02:00" },
         { days: ["Sunday"], start_time: "06:00", end_time: "22:00" },
-      ]),
+      ],
       max_team_off_percentage: 0.3,
     },
   });

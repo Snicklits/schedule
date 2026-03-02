@@ -7,7 +7,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
 }
 
 // ─────────────────────────────────────────────
@@ -85,7 +85,7 @@ model Employee {
   role                String
   hierarchy_rank      Int
   management_tier     ManagementTier
-  specialties         Json
+  specialties         String[]
   status              EmployeeStatus
 
   time_off_requests     TimeOffRequest[]
