@@ -1,0 +1,174 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+// ─────────────────────────────────────────────
+// Enums
+// ─────────────────────────────────────────────
+
+enum EmploymentType {
+  FULL_TIME
+  PART_TIME
+}
+
+/// MANAGER: required on peak shifts, highest authority
+/// ASSISTANT_MANAGER: required on any shift not covered by a Manager
+/// STAFF: cannot fulfill any management coverage requirement
+enum ManagementTier {
+  MANAGER
+  ASSISTANT_MANAGER
+  STAFF
+}
+
+enum EmployeeStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum TimeOffType {
+  VACATION
+  SICK
+  PERSONAL
+  UNPAID
+}
+
+enum TimeOffStatus {
+  PENDING
+  APPROVED
+  DENIED
+}
+
+enum AssignmentStatus {
+  SCHEDULED
+  CONFIRMED
+  SWAPPED
+  CANCELLED
+}
+
+enum ConflictResolutionStrategy {
+  SENIORITY_FIRST
+  ROUND_ROBIN
+  MANUAL
+}
+
+enum ScheduleRunStatus {
+  SUCCESS
+  FAILED
+  PARTIAL
+}
+
+enum ViolationSeverity {
+  BLOCKING
+  WARNING
+}
+
+// ─────────────────────────────────────────────
+// Models
+// ─────────────────────────────────────────────
+
+model Employee {
+  id                  String         @id @default(cuid())
+  name                String
+  email               String         @unique
+  employment_type     EmploymentType
+  weekly_hours_target Int
+  hire_date           DateTime
+  seniority_level     Int
+  role                String
+  hierarchy_rank      Int
+  management_tier     ManagementTier
+  specialties         Json
+  status              EmployeeStatus
+
+  time_off_requests     TimeOffRequest[]
+  assignments           Assignment[]
+  constraint_violations ConstraintViolation[] @relation("ViolationEmployee")
+}
+
+model Shift {
+  id                           String   @id @default(cuid())
+  date                         DateTime
+  start_time                   DateTime
+  end_time                     DateTime
+  duration_hours               Float
+  required_specialty           String?
+  min_staff_count              Int
+  location                     String?
+  is_peak_shift                Boolean  @default(false)
+  requires_management_presence Boolean  @default(true)
+
+  assignments           Assignment[]
+  constraint_violations ConstraintViolation[] @relation("ViolationShift")
+}
+
+model TimeOffRequest {
+  id          String        @id @default(cuid())
+  employee_id String
+  type        TimeOffType
+  start_date  DateTime
+  end_date    DateTime
+  status      TimeOffStatus
+  priority    Int
+  created_at  DateTime
+
+  employee Employee @relation(fields: [employee_id], references: [id])
+}
+
+model Assignment {
+  id             String           @id @default(cuid())
+  employee_id    String
+  shift_id       String
+  status         AssignmentStatus
+  assigned_hours Float
+
+  employee Employee @relation(fields: [employee_id], references: [id])
+  shift    Shift    @relation(fields: [shift_id], references: [id])
+}
+
+model ScheduleConfig {
+  id                            String                     @id @default(cuid())
+  max_consecutive_days          Int                        @default(5)
+  max_weekly_hours              Int                        @default(40)
+  overtime_threshold            Int                        @default(40)
+  min_rest_hours_between_shifts Int
+  schedule_period_days          Int                        @default(7)
+  conflict_resolution_strategy  ConflictResolutionStrategy
+  peak_windows                  Json
+  max_team_off_percentage       Float
+}
+
+model ScheduleRun {
+  id              String            @id @default(cuid())
+  week_start      DateTime
+  generated_at    DateTime
+  config_snapshot Json
+  status          ScheduleRunStatus
+  error_log       String?
+
+  constraint_violations ConstraintViolation[]
+}
+
+model ConstraintViolation {
+  id              String            @id @default(cuid())
+  schedule_run_id String
+  shift_id        String?
+  employee_id     String?
+  rule            String
+  severity        ViolationSeverity
+  message         String
+  overridden_by   String?
+  override_reason String?
+  override_at     DateTime?
+
+  schedule_run ScheduleRun @relation(fields: [schedule_run_id], references: [id])
+  shift        Shift?      @relation("ViolationShift", fields: [shift_id], references: [id])
+  employee     Employee?   @relation("ViolationEmployee", fields: [employee_id], references: [id])
+}

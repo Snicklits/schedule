@@ -1,0 +1,472 @@
+import "dotenv/config";
+import { PrismaClient } from "../generated/prisma/client.js";
+import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const dbPath = path.resolve(__dirname, "../dev.db");
+
+const adapter = new PrismaBetterSqlite3({ url: `file:${dbPath}` });
+const prisma = new PrismaClient({ adapter });
+
+// ─────────────────────────────────────────────
+// Helpers
+// ─────────────────────────────────────────────
+
+function dt(iso: string): Date {
+  return new Date(iso);
+}
+
+/**
+ * Build a full DateTime for a specific date + HH:MM time string.
+ * Prisma stores DateTime as ISO strings; using noon-ish offsets avoids
+ * DST edge cases for date-only fields.
+ */
+function dateAt(date: string, time: string): Date {
+  return new Date(`${date}T${time}:00.000Z`);
+}
+
+// ─────────────────────────────────────────────
+// Seed week: Mon 2026-03-02 → Sun 2026-03-08
+// ─────────────────────────────────────────────
+const WEEK = {
+  MON: "2026-03-02",
+  TUE: "2026-03-03",
+  WED: "2026-03-04",
+  THU: "2026-03-05",
+  FRI: "2026-03-06",
+  SAT: "2026-03-07",
+  SUN: "2026-03-08",
+};
+
+async function main() {
+  console.log("🌱  Seeding database...\n");
+
+  // Idempotency guard — skip if already seeded
+  const existing = await prisma.employee.count();
+  if (existing > 0) {
+    console.log(`ℹ️   Database already seeded (${existing} employees found). Skipping.\n`);
+    await printSummary();
+    return;
+  }
+
+  // ── Employees ────────────────────────────────
+  // 2 Managers
+  const mgr1 = await prisma.employee.create({
+    data: {
+      name: "Alice Hartman",
+      email: "alice.hartman@store.com",
+      employment_type: "FULL_TIME",
+      weekly_hours_target: 40,
+      hire_date: dt("2018-04-15"),
+      seniority_level: 8,
+      role: "Manager",
+      hierarchy_rank: 1,
+      management_tier: "MANAGER",
+      specialties: JSON.stringify(["cashier", "inventory", "forklift"]),
+      status: "ACTIVE",
+    },
+  });
+
+  const mgr2 = await prisma.employee.create({
+    data: {
+      name: "Brian Okafor",
+      email: "brian.okafor@store.com",
+      employment_type: "FULL_TIME",
+      weekly_hours_target: 40,
+      hire_date: dt("2019-07-01"),
+      seniority_level: 7,
+      role: "Manager",
+      hierarchy_rank: 2,
+      management_tier: "MANAGER",
+      specialties: JSON.stringify(["cashier", "customer_service", "training"]),
+      status: "ACTIVE",
+    },
+  });
+
+  // 3 Assistant Managers
+  const am1 = await prisma.employee.create({
+    data: {
+      name: "Carmen Delgado",
+      email: "carmen.delgado@store.com",
+      employment_type: "FULL_TIME",
+      weekly_hours_target: 40,
+      hire_date: dt("2020-02-10"),
+      seniority_level: 6,
+      role: "Assistant Manager",
+      hierarchy_rank: 3,
+      management_tier: "ASSISTANT_MANAGER",
+      specialties: JSON.stringify(["cashier", "customer_service"]),
+      status: "ACTIVE",
+    },
+  });
+
+  const am2 = await prisma.employee.create({
+    data: {
+      name: "Derek Phung",
+      email: "derek.phung@store.com",
+      employment_type: "FULL_TIME",
+      weekly_hours_target: 40,
+      hire_date: dt("2020-09-22"),
+      seniority_level: 5,
+      role: "Assistant Manager",
+      hierarchy_rank: 4,
+      management_tier: "ASSISTANT_MANAGER",
+      specialties: JSON.stringify(["cashier", "forklift", "inventory"]),
+      status: "ACTIVE",
+    },
+  });
+
+  const am3 = await prisma.employee.create({
+    data: {
+      name: "Eva Kowalski",
+      email: "eva.kowalski@store.com",
+      employment_type: "FULL_TIME",
+      weekly_hours_target: 40,
+      hire_date: dt("2021-03-05"),
+      seniority_level: 4,
+      role: "Assistant Manager",
+      hierarchy_rank: 5,
+      management_tier: "ASSISTANT_MANAGER",
+      specialties: JSON.stringify(["cashier", "training"]),
+      status: "ACTIVE",
+    },
+  });
+
+  // 10 Staff (mix of full-time and part-time, varied specialties)
+  const staff = await Promise.all([
+    prisma.employee.create({
+      data: {
+        name: "Frank Rosario",
+        email: "frank.rosario@store.com",
+        employment_type: "FULL_TIME",
+        weekly_hours_target: 40,
+        hire_date: dt("2021-06-14"),
+        seniority_level: 3,
+        role: "Lead",
+        hierarchy_rank: 6,
+        management_tier: "STAFF",
+        specialties: JSON.stringify(["cashier", "forklift"]),
+        status: "ACTIVE",
+      },
+    }),
+    prisma.employee.create({
+      data: {
+        name: "Grace Nwosu",
+        email: "grace.nwosu@store.com",
+        employment_type: "FULL_TIME",
+        weekly_hours_target: 40,
+        hire_date: dt("2021-11-01"),
+        seniority_level: 3,
+        role: "Lead",
+        hierarchy_rank: 7,
+        management_tier: "STAFF",
+        specialties: JSON.stringify(["cashier", "customer_service"]),
+        status: "ACTIVE",
+      },
+    }),
+    prisma.employee.create({
+      data: {
+        name: "Hank Bouchard",
+        email: "hank.bouchard@store.com",
+        employment_type: "FULL_TIME",
+        weekly_hours_target: 40,
+        hire_date: dt("2022-01-19"),
+        seniority_level: 3,
+        role: "Associate",
+        hierarchy_rank: 8,
+        management_tier: "STAFF",
+        specialties: JSON.stringify(["cashier", "inventory"]),
+        status: "ACTIVE",
+      },
+    }),
+    prisma.employee.create({
+      data: {
+        name: "Ingrid Sato",
+        email: "ingrid.sato@store.com",
+        employment_type: "PART_TIME",
+        weekly_hours_target: 32,
+        hire_date: dt("2022-04-11"),
+        seniority_level: 2,
+        role: "Associate",
+        hierarchy_rank: 9,
+        management_tier: "STAFF",
+        specialties: JSON.stringify(["cashier"]),
+        status: "ACTIVE",
+      },
+    }),
+    prisma.employee.create({
+      data: {
+        name: "James Tran",
+        email: "james.tran@store.com",
+        employment_type: "PART_TIME",
+        weekly_hours_target: 20,
+        hire_date: dt("2022-08-30"),
+        seniority_level: 2,
+        role: "Associate",
+        hierarchy_rank: 10,
+        management_tier: "STAFF",
+        specialties: JSON.stringify(["cashier", "stocking"]),
+        status: "ACTIVE",
+      },
+    }),
+    prisma.employee.create({
+      data: {
+        name: "Kira Mendez",
+        email: "kira.mendez@store.com",
+        employment_type: "FULL_TIME",
+        weekly_hours_target: 40,
+        hire_date: dt("2022-10-03"),
+        seniority_level: 2,
+        role: "Associate",
+        hierarchy_rank: 11,
+        management_tier: "STAFF",
+        specialties: JSON.stringify(["stocking", "inventory"]),
+        status: "ACTIVE",
+      },
+    }),
+    prisma.employee.create({
+      data: {
+        name: "Leo Park",
+        email: "leo.park@store.com",
+        employment_type: "PART_TIME",
+        weekly_hours_target: 20,
+        hire_date: dt("2023-02-20"),
+        seniority_level: 1,
+        role: "Associate",
+        hierarchy_rank: 12,
+        management_tier: "STAFF",
+        specialties: JSON.stringify(["cashier"]),
+        status: "ACTIVE",
+      },
+    }),
+    prisma.employee.create({
+      data: {
+        name: "Mia Johansson",
+        email: "mia.johansson@store.com",
+        employment_type: "PART_TIME",
+        weekly_hours_target: 24,
+        hire_date: dt("2023-05-15"),
+        seniority_level: 1,
+        role: "Associate",
+        hierarchy_rank: 13,
+        management_tier: "STAFF",
+        specialties: JSON.stringify(["customer_service", "cashier"]),
+        status: "ACTIVE",
+      },
+    }),
+    prisma.employee.create({
+      data: {
+        name: "Noah Adesanya",
+        email: "noah.adesanya@store.com",
+        employment_type: "FULL_TIME",
+        weekly_hours_target: 40,
+        hire_date: dt("2023-09-01"),
+        seniority_level: 1,
+        role: "Associate",
+        hierarchy_rank: 14,
+        management_tier: "STAFF",
+        specialties: JSON.stringify(["forklift", "stocking"]),
+        status: "ACTIVE",
+      },
+    }),
+    prisma.employee.create({
+      data: {
+        name: "Olivia Reyes",
+        email: "olivia.reyes@store.com",
+        employment_type: "PART_TIME",
+        weekly_hours_target: 20,
+        hire_date: dt("2024-01-08"),
+        seniority_level: 1,
+        role: "Associate",
+        hierarchy_rank: 15,
+        management_tier: "STAFF",
+        specialties: JSON.stringify(["cashier", "customer_service"]),
+        status: "ACTIVE",
+      },
+    }),
+  ]);
+
+  const [s1, s2, s3, s4, s5, s6, s7, s8, s9, s10] = staff;
+
+  console.log(`✅  Created 15 employees (2 managers, 3 AMs, 10 staff)`);
+
+  // ── Shifts ────────────────────────────────────
+  // Mon–Sun, 3 shifts per day: morning (06-14), afternoon (14-22), evening (18-02)
+  // Peak: Friday evening, Saturday all day, Sunday all day
+  const shiftData: Array<{
+    date: string;
+    label: "morning" | "afternoon" | "evening";
+    start: string;
+    end: string;
+    hours: number;
+    isPeak: boolean;
+    specialty?: string;
+  }> = [];
+
+  const days: Array<keyof typeof WEEK> = [
+    "MON",
+    "TUE",
+    "WED",
+    "THU",
+    "FRI",
+    "SAT",
+    "SUN",
+  ];
+
+  for (const day of days) {
+    const isPeakDay = day === "SAT" || day === "SUN";
+    shiftData.push(
+      {
+        date: WEEK[day],
+        label: "morning",
+        start: "06:00",
+        end: "14:00",
+        hours: 8,
+        isPeak: isPeakDay,
+      },
+      {
+        date: WEEK[day],
+        label: "afternoon",
+        start: "14:00",
+        end: "22:00",
+        hours: 8,
+        isPeak: isPeakDay,
+      },
+      {
+        date: WEEK[day],
+        label: "evening",
+        start: "18:00",
+        end: "02:00",
+        hours: 8,
+        // Friday evening + all Sat/Sun shifts are peak
+        isPeak: isPeakDay || day === "FRI",
+      }
+    );
+  }
+
+  const createdShifts = await Promise.all(
+    shiftData.map((s) =>
+      prisma.shift.create({
+        data: {
+          date: dt(`${s.date}T12:00:00.000Z`),
+          start_time: dateAt(s.date, s.start),
+          end_time: dateAt(s.date, s.end),
+          duration_hours: s.hours,
+          required_specialty: s.specialty ?? null,
+          min_staff_count: s.isPeak ? 5 : 3,
+          location: "Main Floor",
+          is_peak_shift: s.isPeak,
+          requires_management_presence: true,
+        },
+      })
+    )
+  );
+
+  console.log(`✅  Created ${createdShifts.length} shifts (Mon–Sun, 3/day)`);
+
+  // ── Time-Off Requests ─────────────────────────
+  await prisma.timeOffRequest.createMany({
+    data: [
+      // Manager requesting vacation (high priority — seniority 8)
+      {
+        employee_id: mgr1.id,
+        type: "VACATION",
+        start_date: dt("2026-03-06T00:00:00.000Z"),
+        end_date: dt("2026-03-08T00:00:00.000Z"),
+        status: "PENDING",
+        priority: mgr1.seniority_level,
+        created_at: dt("2026-02-20T09:00:00.000Z"),
+      },
+      // Assistant Manager requesting sick leave (priority 5)
+      {
+        employee_id: am2.id,
+        type: "SICK",
+        start_date: dt("2026-03-04T00:00:00.000Z"),
+        end_date: dt("2026-03-04T00:00:00.000Z"),
+        status: "PENDING",
+        priority: am2.seniority_level,
+        created_at: dt("2026-03-03T07:30:00.000Z"),
+      },
+      // Staff requesting personal day (priority 3)
+      {
+        employee_id: s1.id,
+        type: "PERSONAL",
+        start_date: dt("2026-03-05T00:00:00.000Z"),
+        end_date: dt("2026-03-05T00:00:00.000Z"),
+        status: "PENDING",
+        priority: s1.seniority_level,
+        created_at: dt("2026-02-28T14:00:00.000Z"),
+      },
+      // Part-time staff requesting unpaid leave (priority 2)
+      {
+        employee_id: s4.id,
+        type: "UNPAID",
+        start_date: dt("2026-03-07T00:00:00.000Z"),
+        end_date: dt("2026-03-08T00:00:00.000Z"),
+        status: "PENDING",
+        priority: s4.seniority_level,
+        created_at: dt("2026-02-25T11:00:00.000Z"),
+      },
+      // Already-approved vacation for another staff member
+      {
+        employee_id: s6.id,
+        type: "VACATION",
+        start_date: dt("2026-03-02T00:00:00.000Z"),
+        end_date: dt("2026-03-03T00:00:00.000Z"),
+        status: "APPROVED",
+        priority: s6.seniority_level,
+        created_at: dt("2026-02-10T10:00:00.000Z"),
+      },
+    ],
+  });
+
+  console.log(`✅  Created 5 time-off requests (PENDING + 1 APPROVED)`);
+
+  // ── ScheduleConfig ────────────────────────────
+  await prisma.scheduleConfig.create({
+    data: {
+      max_consecutive_days: 5,
+      max_weekly_hours: 40,
+      overtime_threshold: 40,
+      min_rest_hours_between_shifts: 8,
+      schedule_period_days: 7,
+      conflict_resolution_strategy: "SENIORITY_FIRST",
+      peak_windows: JSON.stringify([
+        { days: ["Friday"], start_time: "18:00", end_time: "02:00" },
+        { days: ["Saturday"], start_time: "06:00", end_time: "02:00" },
+        { days: ["Sunday"], start_time: "06:00", end_time: "22:00" },
+      ]),
+      max_team_off_percentage: 0.3,
+    },
+  });
+
+  console.log(`✅  Created ScheduleConfig`);
+
+  // ── Summary ───────────────────────────────────
+  console.log();
+  await printSummary();
+  console.log("\n🎉  Seed complete!\n");
+}
+
+async function printSummary() {
+  const counts = await Promise.all([
+    prisma.employee.count(),
+    prisma.shift.count(),
+    prisma.timeOffRequest.count(),
+    prisma.scheduleConfig.count(),
+  ]);
+  console.log("📊  Database summary:");
+  console.log(`   employees        : ${counts[0]}`);
+  console.log(`   shifts           : ${counts[1]}`);
+  console.log(`   time_off_requests: ${counts[2]}`);
+  console.log(`   schedule_configs : ${counts[3]}`);
+}
+
+main()
+  .catch((e) => {
+    console.error("❌  Seed failed:", e);
+    process.exit(1);
+  })
+  .finally(() => prisma.$disconnect());
