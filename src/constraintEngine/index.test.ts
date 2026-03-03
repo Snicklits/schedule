@@ -66,6 +66,8 @@ const manager: Employee = {
   weekly_hours_target: 40,
   management_tier: ManagementTier.MANAGER,
   specialties: ["barista"],
+  seniority_level: 5,
+  hierarchy_rank: 1,
 };
 
 const assistantManager: Employee = {
@@ -75,6 +77,8 @@ const assistantManager: Employee = {
   weekly_hours_target: 40,
   management_tier: ManagementTier.ASSISTANT_MANAGER,
   specialties: [],
+  seniority_level: 3,
+  hierarchy_rank: 2,
 };
 
 const staffEmployee: Employee = {
@@ -84,6 +88,8 @@ const staffEmployee: Employee = {
   weekly_hours_target: 40,
   management_tier: ManagementTier.STAFF,
   specialties: ["barista"],
+  seniority_level: 2,
+  hierarchy_rank: 3,
 };
 
 const partTimeEmployee: Employee = {
@@ -93,6 +99,8 @@ const partTimeEmployee: Employee = {
   weekly_hours_target: 20,
   management_tier: ManagementTier.STAFF,
   specialties: [],
+  seniority_level: 1,
+  hierarchy_rank: 4,
 };
 
 const allEmployees: Employee[] = [
