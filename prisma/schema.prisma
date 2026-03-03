@@ -63,6 +63,7 @@ enum ScheduleRunStatus {
   SUCCESS
   FAILED
   PARTIAL
+  HALTED
 }
 
 enum ViolationSeverity {
@@ -152,8 +153,18 @@ model ScheduleRun {
   config_snapshot Json
   status          ScheduleRunStatus
   error_log       String?
+  errors          Json              @default("[]")
+  warnings        Json              @default("[]")
 
   constraint_violations ConstraintViolation[]
+}
+
+model PeakWindow {
+  id         String   @id @default(cuid())
+  days       String[]
+  start_time String
+  end_time   String
+  label      String?
 }
 
 model ConstraintViolation {

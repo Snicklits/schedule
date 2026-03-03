@@ -23,9 +23,11 @@ function dateAt(date: string, time: string): Date {
 }
 
 // ─────────────────────────────────────────────
-// Seed week: Mon 2026-03-02 → Sun 2026-03-08
+// Seed weeks:
+//   Week 1: Mon 2026-03-02 → Sun 2026-03-08
+//   Week 2: Mon 2026-03-09 → Sun 2026-03-15
 // ─────────────────────────────────────────────
-const WEEK = {
+const WEEK1 = {
   MON: "2026-03-02",
   TUE: "2026-03-03",
   WED: "2026-03-04",
@@ -34,6 +36,18 @@ const WEEK = {
   SAT: "2026-03-07",
   SUN: "2026-03-08",
 };
+
+const WEEK2 = {
+  MON: "2026-03-09",
+  TUE: "2026-03-10",
+  WED: "2026-03-11",
+  THU: "2026-03-12",
+  FRI: "2026-03-13",
+  SAT: "2026-03-14",
+  SUN: "2026-03-15",
+};
+
+type DayKey = keyof typeof WEEK1;
 
 async function main() {
   console.log("🌱  Seeding database...\n");
@@ -288,9 +302,10 @@ async function main() {
   console.log(`✅  Created 15 employees (2 managers, 3 AMs, 10 staff)`);
 
   // ── Shifts ────────────────────────────────────
-  // Mon–Sun, 3 shifts per day: morning (06-14), afternoon (14-22), evening (18-02)
+  // Both weeks: Mon–Sun, 3 shifts per day: morning (06-14), afternoon (14-22), evening (18-02)
   // Peak: Friday evening, Saturday all day, Sunday all day
-  const shiftData: Array<{
+
+  type ShiftTemplate = {
     date: string;
     label: "morning" | "afternoon" | "evening";
     start: string;
@@ -298,48 +313,45 @@ async function main() {
     hours: number;
     isPeak: boolean;
     specialty?: string;
-  }> = [];
+  };
 
-  const days: Array<keyof typeof WEEK> = [
-    "MON",
-    "TUE",
-    "WED",
-    "THU",
-    "FRI",
-    "SAT",
-    "SUN",
-  ];
-
-  for (const day of days) {
-    const isPeakDay = day === "SAT" || day === "SUN";
-    shiftData.push(
-      {
-        date: WEEK[day],
-        label: "morning",
-        start: "06:00",
-        end: "14:00",
-        hours: 8,
-        isPeak: isPeakDay,
-      },
-      {
-        date: WEEK[day],
-        label: "afternoon",
-        start: "14:00",
-        end: "22:00",
-        hours: 8,
-        isPeak: isPeakDay,
-      },
-      {
-        date: WEEK[day],
-        label: "evening",
-        start: "18:00",
-        end: "02:00",
-        hours: 8,
-        // Friday evening + all Sat/Sun shifts are peak
-        isPeak: isPeakDay || day === "FRI",
-      }
-    );
+  function buildWeekShifts(week: Record<DayKey, string>): ShiftTemplate[] {
+    const days: DayKey[] = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
+    const result: ShiftTemplate[] = [];
+    for (const day of days) {
+      const isPeakDay = day === "SAT" || day === "SUN";
+      result.push(
+        {
+          date: week[day],
+          label: "morning",
+          start: "06:00",
+          end: "14:00",
+          hours: 8,
+          isPeak: isPeakDay,
+        },
+        {
+          date: week[day],
+          label: "afternoon",
+          start: "14:00",
+          end: "22:00",
+          hours: 8,
+          isPeak: isPeakDay,
+        },
+        {
+          date: week[day],
+          label: "evening",
+          start: "18:00",
+          end: "02:00",
+          hours: 8,
+          // Friday evening + all Sat/Sun shifts are peak
+          isPeak: isPeakDay || day === "FRI",
+        }
+      );
+    }
+    return result;
   }
+
+  const shiftData = [...buildWeekShifts(WEEK1), ...buildWeekShifts(WEEK2)];
 
   const createdShifts = await Promise.all(
     shiftData.map((s) =>
@@ -359,7 +371,34 @@ async function main() {
     )
   );
 
-  console.log(`✅  Created ${createdShifts.length} shifts (Mon–Sun, 3/day)`);
+  console.log(`✅  Created ${createdShifts.length} shifts (2 weeks × Mon–Sun × 3/day)`);
+
+  // ── PeakWindow ────────────────────────────────
+  // Three peak windows that align with the is_peak_shift flags above.
+  await prisma.peakWindow.createMany({
+    data: [
+      {
+        days: ["Friday"],
+        start_time: "18:00",
+        end_time: "02:00",
+        label: "Friday Evening",
+      },
+      {
+        days: ["Saturday"],
+        start_time: "06:00",
+        end_time: "02:00",
+        label: "Saturday (all day)",
+      },
+      {
+        days: ["Sunday"],
+        start_time: "06:00",
+        end_time: "22:00",
+        label: "Sunday (all day)",
+      },
+    ],
+  });
+
+  console.log(`✅  Created 3 PeakWindow records`);
 
   // ── Time-Off Requests ─────────────────────────
   await prisma.timeOffRequest.createMany({
@@ -414,10 +453,30 @@ async function main() {
         priority: s6.seniority_level,
         created_at: dt("2026-02-10T10:00:00.000Z"),
       },
+      // Week 2: AM requests a day off mid-week
+      {
+        employee_id: am1.id,
+        type: "PERSONAL",
+        start_date: dt("2026-03-11T00:00:00.000Z"),
+        end_date: dt("2026-03-11T00:00:00.000Z"),
+        status: "APPROVED",
+        priority: am1.seniority_level,
+        created_at: dt("2026-03-01T08:00:00.000Z"),
+      },
+      // Week 2: staff requesting vacation
+      {
+        employee_id: s2.id,
+        type: "VACATION",
+        start_date: dt("2026-03-09T00:00:00.000Z"),
+        end_date: dt("2026-03-13T00:00:00.000Z"),
+        status: "APPROVED",
+        priority: s2.seniority_level,
+        created_at: dt("2026-02-15T09:00:00.000Z"),
+      },
     ],
   });
 
-  console.log(`✅  Created 5 time-off requests (PENDING + 1 APPROVED)`);
+  console.log(`✅  Created 7 time-off requests (5 week-1 + 2 week-2)`);
 
   // ── ScheduleConfig ────────────────────────────
   await prisma.scheduleConfig.create({
@@ -451,12 +510,14 @@ async function printSummary() {
     prisma.shift.count(),
     prisma.timeOffRequest.count(),
     prisma.scheduleConfig.count(),
+    prisma.peakWindow.count(),
   ]);
   console.log("📊  Database summary:");
   console.log(`   employees        : ${counts[0]}`);
   console.log(`   shifts           : ${counts[1]}`);
   console.log(`   time_off_requests: ${counts[2]}`);
   console.log(`   schedule_configs : ${counts[3]}`);
+  console.log(`   peak_windows     : ${counts[4]}`);
 }
 
 main()
