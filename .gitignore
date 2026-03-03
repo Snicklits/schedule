@@ -5,6 +5,9 @@ node_modules/
 # Prisma generated client (regenerated via `prisma generate`)
 /generated/
 
+# TypeScript build output
+/dist/
+
 # SQLite dev database
 *.db
 *.db-journal
