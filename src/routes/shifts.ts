@@ -1,11 +1,12 @@
 /**
  * Shift Routes — Phase 5
  *
- * GET    /api/shifts?weekStart=  — list shifts (optional week filter)
- * GET    /api/shifts/:id         — get single shift
- * POST   /api/shifts             — create shift
- * PUT    /api/shifts/:id         — update shift
- * DELETE /api/shifts/:id         — delete shift
+ * GET    /api/shifts?weekStart=      — list shifts (optional week filter)
+ * GET    /api/shifts/:id             — get single shift
+ * POST   /api/shifts                 — create shift
+ * PUT    /api/shifts/:id             — update shift
+ * PUT    /api/shifts/:id/mark-peak   — toggle peak flag on a shift
+ * DELETE /api/shifts/:id             — delete shift
  */
 
 import { Router } from "express";
@@ -16,6 +17,7 @@ import {
   createShift,
   updateShift,
   deleteShift,
+  markShiftAsPeak,
 } from "../repositories/index.js";
 import { ApiError } from "../api/errors.js";
 import { parseBody, parseQuery, parseWeekStart } from "../api/validate.js";
@@ -23,6 +25,7 @@ import {
   createShiftSchema,
   updateShiftSchema,
   shiftsQuerySchema,
+  markPeakSchema,
 } from "../api/schemas.js";
 
 export const shiftRouter = Router();
@@ -81,6 +84,16 @@ shiftRouter.put("/:id", async (req, res) => {
     ...(body.location !== undefined && { location: body.location }),
   };
   const shift = await updateShift(req.params["id"], updates);
+  res.json({ success: true, data: shift });
+});
+
+// ─── PUT /api/shifts/:id/mark-peak ───────────────────────────────────────────
+
+shiftRouter.put("/:id/mark-peak", async (req, res) => {
+  const { isPeak } = parseBody(markPeakSchema, req);
+  const existing = await getShiftById(req.params["id"]);
+  if (!existing) throw new ApiError(404, "NOT_FOUND", "Shift not found");
+  const shift = await markShiftAsPeak(req.params["id"], isPeak);
   res.json({ success: true, data: shift });
 });
 

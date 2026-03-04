@@ -3,15 +3,21 @@
  *
  * GET /api/reports/hours?weekStart=              — weekly hours per employee
  * GET /api/reports/violations?type=&weekStart=   — constraint violations
+ * GET /api/reports/management-gaps?weekStart=    — all shifts with missing management coverage
  */
 
 import { Router } from "express";
 import {
   getWeeklyHoursSummary,
   getAllViolations,
+  getAllManagementGaps,
 } from "../repositories/index.js";
 import { parseQuery, parseWeekStart } from "../api/validate.js";
-import { weekStartQuerySchema, violationsQuerySchema } from "../api/schemas.js";
+import {
+  weekStartQuerySchema,
+  violationsQuerySchema,
+  managementGapsQuerySchema,
+} from "../api/schemas.js";
 
 export const reportsRouter = Router();
 
@@ -34,4 +40,13 @@ reportsRouter.get("/violations", async (req, res) => {
     weekStart,
   });
   res.json({ success: true, data: violations });
+});
+
+// ─── GET /api/reports/management-gaps ────────────────────────────────────────
+
+reportsRouter.get("/management-gaps", async (req, res) => {
+  const { weekStart: weekStartStr } = parseQuery(managementGapsQuerySchema, req);
+  const weekStart = weekStartStr ? parseWeekStart(weekStartStr, "weekStart") : undefined;
+  const gaps = await getAllManagementGaps(weekStart);
+  res.json({ success: true, data: gaps });
 });

@@ -106,6 +106,18 @@ export const violationsQuerySchema = z.object({
   weekStart: z.string().optional(),
 });
 
+// ─── Shifts ───────────────────────────────────────────────────────────────────
+
+export const markPeakSchema = z.object({
+  isPeak: z.boolean(),
+});
+
+// ─── Management gaps ──────────────────────────────────────────────────────────
+
+export const managementGapsQuerySchema = z.object({
+  weekStart: z.string().optional(),
+});
+
 // ─── Peak Windows ─────────────────────────────────────────────────────────────
 
 export const createPeakWindowSchema = z.object({

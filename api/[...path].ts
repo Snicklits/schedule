@@ -25,8 +25,10 @@ import {
   createShiftSchema,
   updateShiftSchema,
   shiftsQuerySchema,
+  markPeakSchema,
   weekStartQuerySchema,
   violationsQuerySchema,
+  managementGapsQuerySchema,
   createPeakWindowSchema,
 } from "../src/api/schemas.js";
 import {
@@ -42,6 +44,7 @@ import {
   createShift,
   updateShift,
   deleteShift,
+  markShiftAsPeak,
   getRequestsByEmployee,
   getAllTimeOffRequests,
   createTimeOffRequest,
@@ -67,6 +70,7 @@ import {
   getPeakShiftsWithManagerCheck,
   getWeeklyHoursSummary,
   getAllViolations,
+  getAllManagementGaps,
   getAllPeakWindows,
   createPeakWindow,
   deletePeakWindow,
@@ -132,7 +136,7 @@ async function handleEmployees(req: VercelRequest, res: VercelResponse, id?: str
   }
 }
 
-async function handleShifts(req: VercelRequest, res: VercelResponse, id?: string): Promise<void> {
+async function handleShifts(req: VercelRequest, res: VercelResponse, id?: string, sub?: string): Promise<void> {
   if (!id) {
     if (req.method === "GET") {
       const { weekStart: ws } = parseQuery(shiftsQuerySchema, req);
@@ -155,6 +159,16 @@ async function handleShifts(req: VercelRequest, res: VercelResponse, id?: string
     } else {
       methodNotAllowed(res);
     }
+    return;
+  }
+
+  // PUT /api/shifts/:id/mark-peak
+  if (sub === "mark-peak") {
+    if (req.method !== "PUT") { methodNotAllowed(res); return; }
+    const { isPeak } = parseBody(markPeakSchema, req);
+    const existing = await getShiftById(id);
+    if (!existing) throw new ApiError(404, "NOT_FOUND", "Shift not found");
+    res.json({ success: true, data: await markShiftAsPeak(id, isPeak) });
     return;
   }
 
@@ -351,8 +365,29 @@ async function handleSchedule(
   res.status(404).json({ success: false, error: { code: "NOT_FOUND", message: "Route not found" } });
 }
 
-async function handleCoverage(req: VercelRequest, res: VercelResponse, seg1?: string): Promise<void> {
+async function handleCoverage(req: VercelRequest, res: VercelResponse, seg1?: string, seg2?: string): Promise<void> {
   if (req.method !== "GET") { methodNotAllowed(res); return; }
+
+  // GET /api/coverage/check/:weekStart — combined coverage report (path param)
+  if (seg1 === "check") {
+    const weekStart = parseWeekStart(seg2, "weekStart");
+    const [managementGaps, peakShifts] = await Promise.all([
+      getShiftsLackingManagementCoverage(weekStart),
+      getPeakShiftsWithManagerCheck(weekStart),
+    ]);
+    const peakWithoutManager = peakShifts.filter((p) => !p.hasManager);
+    res.json({
+      success: true,
+      data: {
+        weekStart: weekStart.toISOString(),
+        managementGaps,
+        peakWithoutManager,
+        isFullyCovered: managementGaps.length === 0 && peakWithoutManager.length === 0,
+      },
+    });
+    return;
+  }
+
   const { weekStart: ws } = parseQuery(weekStartQuerySchema, req);
   const weekStart = parseWeekStart(ws);
   if (seg1 === "gaps") {
@@ -373,6 +408,10 @@ async function handleReports(req: VercelRequest, res: VercelResponse, seg1?: str
   } else if (seg1 === "violations") {
     const { type, weekStart: ws } = parseQuery(violationsQuerySchema, req);
     res.json({ success: true, data: await getAllViolations({ severity: type as "BLOCKING" | "WARNING" | undefined, weekStart: ws ? parseWeekStart(ws) : undefined }) });
+  } else if (seg1 === "management-gaps") {
+    const { weekStart: ws } = parseQuery(managementGapsQuerySchema, req);
+    const gaps = await getAllManagementGaps(ws ? parseWeekStart(ws) : undefined);
+    res.json({ success: true, data: gaps });
   } else {
     res.status(404).json({ success: false, error: { code: "NOT_FOUND", message: "Route not found" } });
   }
@@ -495,10 +534,10 @@ export default withHandler(async (req: VercelRequest, res: VercelResponse) => {
 
   switch (resource) {
     case "employees":       return handleEmployees(req, res, seg1);
-    case "shifts":          return handleShifts(req, res, seg1);
+    case "shifts":          return handleShifts(req, res, seg1, seg2);
     case "time-off":        return handleTimeOff(req, res, seg1, seg2);
     case "schedule":        return handleSchedule(req, res, auth, seg1, seg2);
-    case "coverage":        return handleCoverage(req, res, seg1);
+    case "coverage":        return handleCoverage(req, res, seg1, seg2);
     case "reports":         return handleReports(req, res, seg1);
     case "schedule-config": return handleScheduleConfig(req, res, seg1);
     case "schedule-runs":   return handleScheduleRuns(req, res, seg1);
