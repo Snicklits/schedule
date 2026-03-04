@@ -20,6 +20,7 @@ vi.mock("../../repositories/index.js", () => ({
   createShift: vi.fn().mockResolvedValue({}),
   updateShift: vi.fn().mockResolvedValue({}),
   deleteShift: vi.fn().mockResolvedValue(undefined),
+  markShiftAsPeak: vi.fn(),
   getAssignmentsForWeek: vi.fn().mockResolvedValue([]),
   getAssignmentsForWeekWithDetails: vi.fn().mockResolvedValue([]),
   getAssignmentWithDetails: vi.fn().mockResolvedValue(null),
@@ -244,5 +245,115 @@ describe("GET /api/employees/:id", () => {
 
     expect(res.status).toBe(404);
     expect(res.body.error.code).toBe("NOT_FOUND");
+  });
+});
+
+// ─── PUT /api/shifts/:id/mark-peak ───────────────────────────────────────────
+
+describe("PUT /api/shifts/:id/mark-peak", () => {
+  it("returns 404 when shift does not exist", async () => {
+    vi.mocked(repo.getShiftById).mockResolvedValue(null);
+
+    const res = await request(app)
+      .put("/api/shifts/no-such-id/mark-peak")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ isPeak: true });
+
+    expect(res.status).toBe(404);
+    expect(res.body.error.code).toBe("NOT_FOUND");
+  });
+
+  it("returns 200 and marks the shift as peak", async () => {
+    vi.mocked(repo.getShiftById).mockResolvedValue(mockShift as never);
+    vi.mocked(repo.markShiftAsPeak).mockResolvedValue({ ...mockShift, is_peak_shift: true } as never);
+
+    const res = await request(app)
+      .put("/api/shifts/shift-1/mark-peak")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ isPeak: true });
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(repo.markShiftAsPeak).toHaveBeenCalledWith("shift-1", true);
+  });
+
+  it("returns 400 for missing isPeak field", async () => {
+    const res = await request(app)
+      .put("/api/shifts/shift-1/mark-peak")
+      .set("Authorization", `Bearer ${token}`)
+      .send({});
+
+    expect(res.status).toBe(400);
+  });
+});
+
+// ─── GET /api/coverage/check/:weekStart ──────────────────────────────────────
+
+describe("GET /api/coverage/check/:weekStart", () => {
+  it("returns 200 with isFullyCovered true when no gaps", async () => {
+    vi.mocked(repo.getShiftsLackingManagementCoverage).mockResolvedValue([]);
+    vi.mocked(repo.getPeakShiftsWithManagerCheck).mockResolvedValue([]);
+
+    const res = await request(app)
+      .get("/api/coverage/check/2026-03-02")
+      .set("Authorization", `Bearer ${token}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.isFullyCovered).toBe(true);
+    expect(res.body.data.managementGaps).toHaveLength(0);
+    expect(res.body.data.peakWithoutManager).toHaveLength(0);
+  });
+
+  it("returns 200 with isFullyCovered false when gaps exist", async () => {
+    vi.mocked(repo.getShiftsLackingManagementCoverage).mockResolvedValue([mockShift as never]);
+    vi.mocked(repo.getPeakShiftsWithManagerCheck).mockResolvedValue([
+      { shift: mockShift as never, hasManager: false },
+    ]);
+
+    const res = await request(app)
+      .get("/api/coverage/check/2026-03-02")
+      .set("Authorization", `Bearer ${token}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.isFullyCovered).toBe(false);
+    expect(res.body.data.managementGaps).toHaveLength(1);
+    expect(res.body.data.peakWithoutManager).toHaveLength(1);
+  });
+
+  it("returns 400 for an invalid date", async () => {
+    const res = await request(app)
+      .get("/api/coverage/check/not-a-date")
+      .set("Authorization", `Bearer ${token}`);
+
+    expect(res.status).toBe(400);
+  });
+});
+
+// ─── GET /api/reports/management-gaps ────────────────────────────────────────
+
+describe("GET /api/reports/management-gaps", () => {
+  it("returns 200 with all management gaps (no weekStart)", async () => {
+    vi.mocked(repo.getAllManagementGaps).mockResolvedValue([
+      { shift: mockShift as never, missingTier: "MANAGER_OR_AM" },
+    ]);
+
+    const res = await request(app)
+      .get("/api/reports/management-gaps")
+      .set("Authorization", `Bearer ${token}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.data).toHaveLength(1);
+    expect(res.body.data[0].missingTier).toBe("MANAGER_OR_AM");
+  });
+
+  it("returns 200 scoped to a week when weekStart is provided", async () => {
+    vi.mocked(repo.getAllManagementGaps).mockResolvedValue([]);
+
+    const res = await request(app)
+      .get("/api/reports/management-gaps?weekStart=2026-03-02")
+      .set("Authorization", `Bearer ${token}`);
+
+    expect(res.status).toBe(200);
+    expect(repo.getAllManagementGaps).toHaveBeenCalledWith(expect.any(Date));
   });
 });
