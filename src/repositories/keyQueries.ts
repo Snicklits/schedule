@@ -107,7 +107,6 @@ export async function getConsecutiveWorkingDays(
       },
     },
     select: { shift: { select: { date: true } } },
-    include: undefined,
   });
 
   const workedMs = new Set(

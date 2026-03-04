@@ -10,6 +10,7 @@
  */
 
 import express from "express";
+import cors from "cors";
 import { errorHandler } from "./api/errors.js";
 import { requestLog } from "./middleware/requestLog.js";
 import { requireAuth } from "./middleware/auth.js";
@@ -25,6 +26,8 @@ import { peakWindowRouter } from "./routes/peakWindows.js";
 const app = express();
 
 // ─── Global middleware ────────────────────────────────────────────────────────
+const allowedOrigin = process.env["CLIENT_ORIGIN"] ?? "*";
+app.use(cors({ origin: allowedOrigin, credentials: true }));
 app.use(express.json());
 app.use(requestLog);
 
