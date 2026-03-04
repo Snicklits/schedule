@@ -15,5 +15,5 @@
     "skipLibCheck": true,
     "outDir": "dist"
   },
-  "exclude": ["**/__tests__/**", "**/*.test.ts", "dist/**", "vitest.config.ts", "prisma/**", "client/**"]
+  "exclude": ["**/__tests__/**", "**/*.test.ts", "dist/**", "vitest.config.ts", "prisma/**", "client/**", "api/**"]
 }
