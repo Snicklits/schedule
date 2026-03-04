@@ -205,6 +205,99 @@ export async function getPeakShiftsWithManagerCheck(
   }));
 }
 
+// ─── Phase 5 additions ───────────────────────────────────────────────────────
+
+/**
+ * Returns all management-required shifts that lack the appropriate coverage.
+ * Peak shifts need a MANAGER; non-peak shifts need MANAGER or ASSISTANT_MANAGER.
+ * Optionally scoped to a single week via weekStart.
+ */
+export async function getAllManagementGaps(
+  weekStart?: Date
+): Promise<Array<{ shift: Shift; missingTier: "MANAGER" | "MANAGER_OR_AM" }>> {
+  const weekEnd = weekStart ? new Date(weekStart) : undefined;
+  if (weekStart && weekEnd) {
+    weekEnd.setUTCDate(weekEnd.getUTCDate() + 6);
+    weekEnd.setUTCHours(23, 59, 59, 999);
+  }
+
+  const shifts = await prisma.shift.findMany({
+    where: {
+      requires_management_presence: true,
+      ...(weekStart && weekEnd && { date: { gte: weekStart, lte: weekEnd } }),
+    },
+    include: {
+      assignments: {
+        where: { status: { not: "CANCELLED" } },
+        include: { employee: { select: { management_tier: true } } },
+      },
+    },
+    orderBy: [{ date: "asc" }, { start_time: "asc" }],
+  });
+
+  return shifts
+    .filter(
+      (s) =>
+        !s.assignments.some(
+          (a) =>
+            a.employee.management_tier === "MANAGER" ||
+            a.employee.management_tier === "ASSISTANT_MANAGER"
+        )
+    )
+    .map((s) => ({
+      shift: toShift(s),
+      missingTier: s.is_peak_shift
+        ? ("MANAGER" as const)
+        : ("MANAGER_OR_AM" as const),
+    }));
+}
+
+/**
+ * Returns a weekly hours summary for all ACTIVE employees.
+ * isAtCap is true when weeklyHours >= hoursCap (default 40).
+ */
+export async function getWeeklyHoursSummary(
+  weekStart: Date,
+  hoursCap = 40
+): Promise<
+  Array<{
+    employeeId: string;
+    name: string;
+    weeklyHours: number;
+    isAtCap: boolean;
+  }>
+> {
+  const weekEnd = new Date(weekStart);
+  weekEnd.setUTCDate(weekEnd.getUTCDate() + 6);
+  weekEnd.setUTCHours(23, 59, 59, 999);
+
+  const employees = await prisma.employee.findMany({
+    where: { status: "ACTIVE" },
+    include: {
+      assignments: {
+        where: {
+          status: { not: "CANCELLED" },
+          shift: { date: { gte: weekStart, lte: weekEnd } },
+        },
+      },
+    },
+    orderBy: { hierarchy_rank: "asc" },
+  });
+
+  return employees.map((emp) => {
+    const weeklyHours = emp.assignments.reduce(
+      (sum, a) => sum + a.assigned_hours,
+      0
+    );
+    return {
+      employeeId: emp.id,
+      name: emp.name,
+      weeklyHours,
+      isAtCap: weeklyHours >= hoursCap,
+    };
+  });
+}
+
 // ─── 6. Available management employees for a date ────────────────────────────
 
 /**

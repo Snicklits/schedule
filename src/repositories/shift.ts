@@ -60,6 +60,28 @@ export async function markShiftAsPeak(
   return toShift(row);
 }
 
+/** Returns all shifts, ordered by date and start_time. */
+export async function getAllShifts(): Promise<Shift[]> {
+  const rows = await prisma.shift.findMany({
+    orderBy: [{ date: "asc" }, { start_time: "asc" }],
+  });
+  return rows.map(toShift);
+}
+
+/** Updates mutable fields of an existing shift. */
+export async function updateShift(
+  id: string,
+  data: Partial<Omit<Shift, "id"> & { location?: string | null }>
+): Promise<Shift> {
+  const row = await prisma.shift.update({ where: { id }, data });
+  return toShift(row);
+}
+
+/** Deletes a shift by ID. Throws a Prisma error if not found. */
+export async function deleteShift(id: string): Promise<void> {
+  await prisma.shift.delete({ where: { id } });
+}
+
 /** Creates a new shift. */
 export async function createShift(
   data: Omit<Shift, "id"> & { location?: string }

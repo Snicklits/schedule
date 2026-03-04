@@ -1,59 +1,126 @@
+/**
+ * Time-Off Routes — Phase 5
+ *
+ * GET    /api/time-off?employeeId=  — list requests for an employee
+ * POST   /api/time-off              — create a new request
+ * PUT    /api/time-off/:id/approve  — approve or deny (safety check for APPROVED)
+ * DELETE /api/time-off/:id          — delete a request
+ */
+
 import { Router } from "express";
-import { prisma } from "../lib/prisma.js";
+import type { TimeOffRequest } from "../constraintEngine/types.js";
+import { managementTimeOffIsSafe } from "../constraintEngine/index.js";
+import {
+  getRequestsByEmployee,
+  createTimeOffRequest,
+  getTimeOffById,
+  deleteTimeOffRequest,
+  updateRequestStatus,
+  getShiftsByWeek,
+  getAssignmentsForWeek,
+  getAllActiveEmployees,
+  toEmployee,
+  toTimeOffRequest,
+} from "../repositories/index.js";
+import { ApiError } from "../api/errors.js";
+import { parseBody, parseQuery } from "../api/validate.js";
+import {
+  createTimeOffSchema,
+  approveTimeOffSchema,
+  timeOffQuerySchema,
+} from "../api/schemas.js";
 
 export const timeOffRouter = Router();
 
-timeOffRouter.get("/", async (_req, res) => {
-  try {
-    const requests = await prisma.timeOffRequest.findMany({
-      orderBy: { created_at: "desc" },
-    });
-    res.json(requests);
-  } catch (err) {
-    res.status(500).json({ error: "Failed to fetch time-off requests" });
-  }
+/** Returns the Monday of the week containing the given date (UTC). */
+function getWeekStartDate(date: Date): Date {
+  const d = new Date(date);
+  d.setUTCHours(0, 0, 0, 0);
+  const dow = d.getUTCDay(); // 0 = Sun
+  const diff = (dow + 6) % 7; // days since Monday
+  d.setUTCDate(d.getUTCDate() - diff);
+  return d;
+}
+
+// ─── GET /api/time-off ────────────────────────────────────────────────────────
+
+timeOffRouter.get("/", async (req, res) => {
+  const { employeeId } = parseQuery(timeOffQuerySchema, req);
+  const requests = await getRequestsByEmployee(employeeId);
+  res.json({ success: true, data: requests });
 });
 
-timeOffRouter.get("/:id", async (req, res) => {
-  try {
-    const request = await prisma.timeOffRequest.findUnique({
-      where: { id: req.params["id"] },
-      include: { employee: true },
-    });
-    if (!request)
-      return res.status(404).json({ error: "Time-off request not found" });
-    res.json(request);
-  } catch (err) {
-    res.status(500).json({ error: "Failed to fetch time-off request" });
-  }
-});
+// ─── POST /api/time-off ───────────────────────────────────────────────────────
 
 timeOffRouter.post("/", async (req, res) => {
-  try {
-    const request = await prisma.timeOffRequest.create({ data: req.body });
-    res.status(201).json(request);
-  } catch (err) {
-    res.status(400).json({ error: "Failed to create time-off request" });
-  }
+  const body = parseBody(createTimeOffSchema, req);
+  const request = await createTimeOffRequest({
+    employee_id: body.employeeId,
+    type: body.type,
+    start_date: new Date(body.startDate),
+    end_date: new Date(body.endDate),
+    priority: body.priority,
+  });
+  res.status(201).json({ success: true, data: request });
 });
 
-timeOffRouter.put("/:id", async (req, res) => {
-  try {
-    const request = await prisma.timeOffRequest.update({
-      where: { id: req.params["id"] },
-      data: req.body,
-    });
-    res.json(request);
-  } catch (err) {
-    res.status(400).json({ error: "Failed to update time-off request" });
+// ─── PUT /api/time-off/:id/approve ────────────────────────────────────────────
+
+timeOffRouter.put("/:id/approve", async (req, res) => {
+  const { status } = parseBody(approveTimeOffSchema, req);
+  const { id } = req.params;
+
+  const rawRequest = await getTimeOffById(id);
+  if (!rawRequest) throw new ApiError(404, "NOT_FOUND", "Time-off request not found");
+
+  // DENIED never requires a coverage check
+  if (status === "DENIED") {
+    const updated = await updateRequestStatus(id, "DENIED");
+    return res.json({ success: true, data: updated });
   }
+
+  // APPROVED: run management coverage safety check for non-STAFF employees
+  const employee = toEmployee(rawRequest.employee);
+
+  if (employee.management_tier !== "STAFF") {
+    const weekStart = getWeekStartDate(rawRequest.start_date);
+    const [shifts, assignments, allEmployees] = await Promise.all([
+      getShiftsByWeek(weekStart),
+      getAssignmentsForWeek(weekStart),
+      getAllActiveEmployees(),
+    ]);
+
+    const simulatedTimeOff: TimeOffRequest = {
+      ...toTimeOffRequest(rawRequest),
+      status: "APPROVED",
+    };
+
+    const safetyCheck = managementTimeOffIsSafe(
+      employee,
+      simulatedTimeOff,
+      { shifts, assignments },
+      allEmployees
+    );
+
+    if (!safetyCheck.valid) {
+      throw new ApiError(
+        409,
+        "MANAGEMENT_COVERAGE_UNSAFE",
+        "Approving this time-off would break management coverage",
+        { reasons: safetyCheck.reasons }
+      );
+    }
+  }
+
+  const updated = await updateRequestStatus(id, "APPROVED");
+  res.json({ success: true, data: updated });
 });
+
+// ─── DELETE /api/time-off/:id ─────────────────────────────────────────────────
 
 timeOffRouter.delete("/:id", async (req, res) => {
-  try {
-    await prisma.timeOffRequest.delete({ where: { id: req.params["id"] } });
-    res.status(204).end();
-  } catch (err) {
-    res.status(400).json({ error: "Failed to delete time-off request" });
-  }
+  const existing = await getTimeOffById(req.params["id"]);
+  if (!existing) throw new ApiError(404, "NOT_FOUND", "Time-off request not found");
+  await deleteTimeOffRequest(req.params["id"]);
+  res.status(204).end();
 });

@@ -52,6 +52,38 @@ export async function getViolationsForRun(
 }
 
 /**
+ * Returns all violations, optionally filtered by severity and/or week.
+ * Used by GET /api/reports/violations.
+ */
+export async function getAllViolations(filters?: {
+  severity?: "BLOCKING" | "WARNING";
+  weekStart?: Date;
+}): Promise<ViolationRecord[]> {
+  let scheduleRunIds: string[] | undefined;
+
+  if (filters?.weekStart) {
+    const weekEnd = new Date(filters.weekStart);
+    weekEnd.setUTCDate(weekEnd.getUTCDate() + 6);
+    weekEnd.setUTCHours(23, 59, 59, 999);
+    const runs = await prisma.scheduleRun.findMany({
+      where: { week_start: { gte: filters.weekStart, lte: weekEnd } },
+      select: { id: true },
+    });
+    scheduleRunIds = runs.map((r) => r.id);
+  }
+
+  return prisma.constraintViolation.findMany({
+    where: {
+      ...(filters?.severity && { severity: filters.severity }),
+      ...(scheduleRunIds !== undefined && {
+        schedule_run_id: { in: scheduleRunIds },
+      }),
+    },
+    orderBy: [{ severity: "asc" }, { id: "asc" }],
+  }) as Promise<ViolationRecord[]>;
+}
+
+/**
  * Records that a manager has manually overridden a constraint violation.
  * Fields are set in-place on the existing violation record (no new row).
  */

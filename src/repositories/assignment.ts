@@ -90,3 +90,44 @@ export async function updateAssignmentStatus(
 export async function deleteAssignment(id: string): Promise<void> {
   await prisma.assignment.delete({ where: { id } });
 }
+
+// ─── Phase 5 additions ───────────────────────────────────────────────────────
+
+/**
+ * Returns a raw Prisma assignment row (with employee and shift included)
+ * for the manual override endpoint.  Returns null if not found.
+ */
+export async function getAssignmentWithDetails(id: string) {
+  return prisma.assignment.findUnique({
+    where: { id },
+    include: { employee: true, shift: true },
+  });
+}
+
+/**
+ * Re-assigns an existing assignment to a different employee.
+ * Returns the full Prisma row (employee + shift) for the API response.
+ */
+export async function reassignAssignment(id: string, newEmployeeId: string) {
+  return prisma.assignment.update({
+    where: { id },
+    data: { employee_id: newEmployeeId },
+    include: { employee: true, shift: true },
+  });
+}
+
+/**
+ * Returns all assignments for a week with full Prisma employee + shift records.
+ * Used by GET /api/schedule/:weekStart to build the display payload.
+ */
+export async function getAssignmentsForWeekWithDetails(weekStart: Date) {
+  const weekEnd = new Date(weekStart);
+  weekEnd.setUTCDate(weekEnd.getUTCDate() + 6);
+  weekEnd.setUTCHours(23, 59, 59, 999);
+
+  return prisma.assignment.findMany({
+    where: { shift: { date: { gte: weekStart, lte: weekEnd } } },
+    include: { employee: true, shift: true },
+    orderBy: [{ shift: { date: "asc" } }, { shift: { start_time: "asc" } }],
+  });
+}

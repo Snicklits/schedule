@@ -87,6 +87,22 @@ export async function createTimeOffRequest(data: {
   return toTimeOffRequest(row);
 }
 
+/**
+ * Returns a single time-off request with employee included, or null.
+ * Used by PUT /api/time-off/:id/approve.
+ */
+export async function getTimeOffById(id: string) {
+  return prisma.timeOffRequest.findUnique({
+    where: { id },
+    include: { employee: true },
+  });
+}
+
+/** Deletes a time-off request by ID. Throws if not found. */
+export async function deleteTimeOffRequest(id: string): Promise<void> {
+  await prisma.timeOffRequest.delete({ where: { id } });
+}
+
 /** Updates the status of a time-off request (approve or deny). */
 export async function updateRequestStatus(
   id: string,
