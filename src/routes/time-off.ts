@@ -12,6 +12,7 @@ import type { TimeOffRequest } from "../constraintEngine/types.js";
 import { managementTimeOffIsSafe } from "../constraintEngine/index.js";
 import {
   getRequestsByEmployee,
+  getAllTimeOffRequests,
   createTimeOffRequest,
   getTimeOffById,
   deleteTimeOffRequest,
@@ -41,6 +42,13 @@ function getWeekStartDate(date: Date): Date {
   d.setUTCDate(d.getUTCDate() - diff);
   return d;
 }
+
+// ─── GET /api/time-off/all ────────────────────────────────────────────────────
+
+timeOffRouter.get("/all", async (_req, res) => {
+  const requests = await getAllTimeOffRequests();
+  res.json({ success: true, data: requests });
+});
 
 // ─── GET /api/time-off ────────────────────────────────────────────────────────
 

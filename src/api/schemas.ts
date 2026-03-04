@@ -37,10 +37,13 @@ export const updateEmployeeSchema = z.object({
   role: z.string().min(1).optional(),
   specialties: z.array(z.string()).optional(),
   status: z.enum(["ACTIVE", "INACTIVE"]).optional(),
+  management_tier: z.enum(["MANAGER", "ASSISTANT_MANAGER", "STAFF"]).optional(),
+  employment_type: z.enum(["FULL_TIME", "PART_TIME"]).optional(),
 });
 
 export const employeeQuerySchema = z.object({
   tier: z.enum(["MANAGER", "ASSISTANT_MANAGER", "STAFF"]).optional(),
+  all: z.enum(["true"]).optional(),
 });
 
 // ─── Time-Off ─────────────────────────────────────────────────────────────────

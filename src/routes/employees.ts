@@ -10,6 +10,7 @@
 import { Router } from "express";
 import {
   getAllActiveEmployees,
+  getAllEmployeesWithStatus,
   getEmployeesByTier,
   getEmployeeById,
   createEmployee,
@@ -29,10 +30,13 @@ export const employeeRouter = Router();
 // ─── GET /api/employees ───────────────────────────────────────────────────────
 
 employeeRouter.get("/", async (req, res) => {
-  const { tier } = parseQuery(employeeQuerySchema, req);
-  const employees = tier
-    ? await getEmployeesByTier(tier as ManagementTier)
-    : await getAllActiveEmployees();
+  const { tier, all } = parseQuery(employeeQuerySchema, req);
+  const employees =
+    all === "true"
+      ? await getAllEmployeesWithStatus()
+      : tier
+        ? await getEmployeesByTier(tier as ManagementTier)
+        : await getAllActiveEmployees();
   res.json({ success: true, data: employees });
 });
 

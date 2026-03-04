@@ -62,14 +62,33 @@ export async function createEmployee(
   return toEmployee(row);
 }
 
+/** Returns all employees (including INACTIVE) with full fields for the manager UI. */
+export async function getAllEmployeesWithStatus() {
+  const rows = await prisma.employee.findMany({
+    orderBy: [{ management_tier: "asc" }, { hierarchy_rank: "asc" }],
+  });
+  return rows.map((r) => ({
+    ...toEmployee(r),
+    status: r.status as "ACTIVE" | "INACTIVE",
+    email: r.email,
+    hire_date: r.hire_date,
+    role: r.role,
+  }));
+}
+
 /** Updates an existing employee's mutable fields. */
 export async function updateEmployee(
   id: string,
   updates: Partial<
-    Pick<Employee, "name" | "specialties" | "seniority_level" | "weekly_hours_target"> & {
-      role?: string;
-      status?: "ACTIVE" | "INACTIVE";
-    }
+    Pick<
+      Employee,
+      | "name"
+      | "specialties"
+      | "seniority_level"
+      | "weekly_hours_target"
+      | "management_tier"
+      | "employment_type"
+    > & { role?: string; status?: "ACTIVE" | "INACTIVE" }
   >
 ): Promise<Employee> {
   const row = await prisma.employee.update({

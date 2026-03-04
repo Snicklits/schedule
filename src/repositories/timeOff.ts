@@ -53,6 +53,18 @@ export async function getPendingRequestsForWeek(
   return rows.map(toTimeOffRequest);
 }
 
+/**
+ * Returns ALL time-off requests with employee data joined.
+ * Used by GET /api/time-off/all (manager dashboard).
+ * Sorted by employee seniority DESC, then created_at ASC.
+ */
+export async function getAllTimeOffRequests() {
+  return prisma.timeOffRequest.findMany({
+    include: { employee: true },
+    orderBy: [{ employee: { seniority_level: "desc" } }, { created_at: "asc" }],
+  });
+}
+
 /** Returns all time-off requests for a given employee. */
 export async function getRequestsByEmployee(
   employeeId: string
