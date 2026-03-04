@@ -1,32 +1,57 @@
-import { useState } from "react";
-import { generateSchedule } from "../api/endpoints.js";
-import type { ScheduleGenerateResult } from "../api/types.js";
+import { useState, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
+import { generateSchedule, fetchCoverageCheck } from "../api/endpoints.js";
+import type { ScheduleGenerateResult, CoverageCheckResult } from "../api/types.js";
 import { ErrorBanner } from "../components/ErrorBanner.js";
 import { useAlerts } from "../contexts/AlertsContext.js";
 
 function toMonday(dateStr: string): string {
   const d = new Date(dateStr + "T00:00:00Z");
   const dow = d.getUTCDay();
-  const diff = (dow + 6) % 7;
-  d.setUTCDate(d.getUTCDate() - diff);
+  d.setUTCDate(d.getUTCDate() - ((dow + 6) % 7));
   return d.toISOString().slice(0, 10);
 }
 
 export function ScheduleGenerator() {
+  const navigate = useNavigate();
   const [weekStart, setWeekStart] = useState(() => toMonday(new Date().toISOString().slice(0, 10)));
   const [loading, setLoading] = useState(false);
+  const [checkingCoverage, setCheckingCoverage] = useState(false);
   const [result, setResult] = useState<ScheduleGenerateResult | null>(null);
+  const [coverageCheck, setCoverageCheck] = useState<CoverageCheckResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const { refresh } = useAlerts();
+
+  const runCoverageCheck = useCallback(
+    async (week: string) => {
+      setCheckingCoverage(true);
+      try {
+        const check = await fetchCoverageCheck(week);
+        setCoverageCheck(check);
+        return check;
+      } catch {
+        // Coverage check failure is non-blocking for viewing results
+        setCoverageCheck(null);
+        return null;
+      } finally {
+        setCheckingCoverage(false);
+      }
+    },
+    []
+  );
 
   async function handleGenerate() {
     setLoading(true);
     setError(null);
     setResult(null);
+    setCoverageCheck(null);
     try {
       const data = await generateSchedule(weekStart);
       setResult(data);
       refresh();
+      if (data.isPublishable) {
+        await runCoverageCheck(weekStart);
+      }
     } catch (err: unknown) {
       const msg =
         (err as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error
@@ -37,8 +62,32 @@ export function ScheduleGenerator() {
     }
   }
 
+  function handleDiscard() {
+    setResult(null);
+    setCoverageCheck(null);
+    setError(null);
+  }
+
+  function handlePublish() {
+    // Navigate to the schedule grid for the generated week
+    navigate(`/?week=${weekStart}`);
+  }
+
+  const publishBlocked =
+    !result?.isPublishable ||
+    checkingCoverage ||
+    (coverageCheck !== null && !coverageCheck.isFullyCovered);
+
+  const publishTooltip = !result?.isPublishable
+    ? "Cannot publish: schedule generation halted with blocking errors"
+    : checkingCoverage
+      ? "Checking coverage…"
+      : coverageCheck && !coverageCheck.isFullyCovered
+        ? `Cannot publish: ${coverageCheck.managementGaps.length} management gap(s) and ${coverageCheck.peakWithoutManager.length} peak shift(s) without a manager`
+        : "Publish this schedule";
+
   return (
-    <div className="max-w-xl mx-auto py-10 px-4 space-y-6">
+    <div className="max-w-2xl mx-auto py-10 px-4 space-y-6">
       <h1 className="text-2xl font-bold text-gray-800">Generate Schedule</h1>
 
       <div className="bg-white rounded-lg border shadow-sm p-6 space-y-4">
@@ -66,16 +115,13 @@ export function ScheduleGenerator() {
 
       {result && (
         <div
-          className={`rounded-lg border p-6 space-y-3 ${
-            result.isPublishable
-              ? "bg-green-50 border-green-300"
-              : "bg-red-50 border-red-300"
+          className={`rounded-lg border p-6 space-y-4 ${
+            result.isPublishable ? "bg-green-50 border-green-300" : "bg-red-50 border-red-300"
           }`}
         >
+          {/* Status header */}
           <div className="flex items-center gap-3">
-            <span
-              className={`text-2xl ${result.isPublishable ? "text-green-600" : "text-red-600"}`}
-            >
+            <span className={`text-2xl ${result.isPublishable ? "text-green-600" : "text-red-600"}`}>
               {result.isPublishable ? "✓" : "✗"}
             </span>
             <div>
@@ -86,6 +132,7 @@ export function ScheduleGenerator() {
             </div>
           </div>
 
+          {/* Errors */}
           {result.errors.length > 0 && (
             <div className="space-y-1">
               <p className="text-sm font-medium text-red-700">Errors ({result.errors.length}):</p>
@@ -97,6 +144,7 @@ export function ScheduleGenerator() {
             </div>
           )}
 
+          {/* Warnings */}
           {result.warnings.length > 0 && (
             <div className="space-y-1">
               <p className="text-sm font-medium text-yellow-700">Warnings ({result.warnings.length}):</p>
@@ -108,12 +156,81 @@ export function ScheduleGenerator() {
             </div>
           )}
 
-          <button
-            disabled={!result.isPublishable}
-            className="mt-2 bg-green-600 hover:bg-green-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-medium py-2 px-4 rounded text-sm"
-          >
-            Publish Schedule
-          </button>
+          {/* Coverage check result */}
+          {result.isPublishable && (
+            <div className="border-t pt-3">
+              {checkingCoverage && (
+                <p className="text-xs text-gray-400">Checking coverage…</p>
+              )}
+              {!checkingCoverage && coverageCheck && (
+                coverageCheck.isFullyCovered ? (
+                  <p className="text-sm text-green-700 font-medium">✓ Full management coverage confirmed</p>
+                ) : (
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium text-red-700">Coverage gaps prevent publishing:</p>
+                    {coverageCheck.managementGaps.length > 0 && (
+                      <p className="text-xs text-red-600">
+                        {coverageCheck.managementGaps.length} shift(s) without any management presence
+                      </p>
+                    )}
+                    {coverageCheck.peakWithoutManager.length > 0 && (
+                      <p className="text-xs text-yellow-700">
+                        {coverageCheck.peakWithoutManager.length} peak shift(s) without a Manager (AM only)
+                      </p>
+                    )}
+                  </div>
+                )
+              )}
+            </div>
+          )}
+
+          {/* Assignment preview */}
+          {result.isPublishable && result.schedule.length > 0 && (
+            <details className="border-t pt-3">
+              <summary className="text-sm font-medium text-gray-700 cursor-pointer select-none">
+                Preview assignments ({result.schedule.length})
+              </summary>
+              <div className="mt-2 max-h-48 overflow-y-auto space-y-1">
+                {result.schedule.map((a) => (
+                  <div key={a.id} className="text-xs flex items-center gap-2 py-0.5">
+                    <span className="text-gray-500 w-20 shrink-0">{a.shift.date.slice(5)}</span>
+                    <span className="text-gray-500 w-24 shrink-0">
+                      {a.shift.start_time.slice(11, 16)}–{a.shift.end_time.slice(11, 16)}
+                    </span>
+                    <span className="font-medium text-gray-800">{a.employee.name}</span>
+                    <span className="text-gray-400">({a.employee.management_tier.replace("_", " ")})</span>
+                    {a.shift.required_specialty && (
+                      <span className="text-gray-400">· {a.shift.required_specialty}</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </details>
+          )}
+
+          {/* Actions */}
+          <div className="flex gap-3 border-t pt-3">
+            <button
+              onClick={handleDiscard}
+              className="bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-2 px-4 rounded text-sm"
+            >
+              Discard
+            </button>
+            <div className="relative group">
+              <button
+                onClick={handlePublish}
+                disabled={publishBlocked}
+                className="bg-green-600 hover:bg-green-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-medium py-2 px-4 rounded text-sm"
+              >
+                {checkingCoverage ? "Checking coverage…" : "Publish Schedule"}
+              </button>
+              {publishBlocked && (
+                <div className="absolute bottom-full left-0 mb-1 w-72 bg-gray-900 text-white text-xs rounded px-2 py-1 hidden group-hover:block z-10 pointer-events-none">
+                  {publishTooltip}
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       )}
     </div>

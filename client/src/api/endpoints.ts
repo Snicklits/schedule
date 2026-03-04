@@ -80,3 +80,13 @@ export const fetchManagementGaps = (weekStart: string) =>
   api
     .get<{ success: true; data: ManagementGap[] }>(`/coverage/gaps?weekStart=${weekStart}`)
     .then((r) => r.data.data ?? []);
+
+export const fetchCoverageCheck = (weekStart: string) =>
+  api
+    .get<{ success: true; data: import("./types.js").CoverageCheckResult }>(`/coverage/check/${weekStart}`)
+    .then((r) => r.data.data);
+
+export const markShiftPeak = (id: string, isPeak: boolean) =>
+  api
+    .put<{ success: true; data: import("./types.js").Shift }>(`/shifts/${id}/mark-peak`, { isPeak })
+    .then((r) => r.data.data);

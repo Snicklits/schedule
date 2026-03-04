@@ -1,4 +1,5 @@
 import { NavLink } from "react-router-dom";
+import { useAuth } from "../contexts/AuthContext.js";
 
 const links = [
   { to: "/", label: "Schedule" },
@@ -9,6 +10,8 @@ const links = [
 ];
 
 export function NavBar() {
+  const { logout } = useAuth();
+
   return (
     <nav className="bg-gray-900 text-white px-4 py-3 flex items-center gap-6 shrink-0">
       <span className="font-bold text-lg tracking-tight mr-4">ScheduleMgr</span>
@@ -26,6 +29,14 @@ export function NavBar() {
           {label}
         </NavLink>
       ))}
+      <div className="ml-auto">
+        <button
+          onClick={logout}
+          className="text-sm text-gray-400 hover:text-white transition-colors"
+        >
+          Sign out
+        </button>
+      </div>
     </nav>
   );
 }

@@ -127,3 +127,12 @@ export interface ApiErrorBody {
   success: false;
   error: { code: string; message: string; details?: unknown };
 }
+
+// ─── Coverage ─────────────────────────────────────────────────────────────────
+
+export interface CoverageCheckResult {
+  weekStart: string;
+  managementGaps: Shift[];
+  peakWithoutManager: Array<{ shift: Shift; hasManager: boolean }>;
+  isFullyCovered: boolean;
+}
