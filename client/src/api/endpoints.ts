@@ -14,10 +14,10 @@ import type {
 // ─── Employees ────────────────────────────────────────────────────────────────
 
 export const fetchEmployees = () =>
-  api.get<{ success: true; data: Employee[] }>("/employees").then((r) => r.data.data);
+  api.get<{ success: true; data: Employee[] }>("/employees").then((r) => r.data.data ?? []);
 
 export const fetchAllEmployees = () =>
-  api.get<{ success: true; data: EmployeeWithStatus[] }>("/employees?all=true").then((r) => r.data.data);
+  api.get<{ success: true; data: EmployeeWithStatus[] }>("/employees?all=true").then((r) => r.data.data ?? []);
 
 export const createEmployee = (body: Record<string, unknown>) =>
   api.post<{ success: true; data: Employee }>("/employees", body).then((r) => r.data.data);
@@ -35,7 +35,7 @@ export const generateSchedule = (weekStart: string) =>
 export const fetchSchedule = (weekStart: string) =>
   api
     .get<{ success: true; data: AssignmentWithDetails[] }>(`/schedule/${weekStart}`)
-    .then((r) => r.data.data);
+    .then((r) => r.data.data ?? []);
 
 export const reassignAssignment = (id: string, employeeId: string, reason?: string) =>
   api
@@ -48,7 +48,7 @@ export const reassignAssignment = (id: string, employeeId: string, reason?: stri
 // ─── Time-Off ─────────────────────────────────────────────────────────────────
 
 export const fetchAllTimeOff = () =>
-  api.get<{ success: true; data: TimeOffWithEmployee[] }>("/time-off/all").then((r) => r.data.data);
+  api.get<{ success: true; data: TimeOffWithEmployee[] }>("/time-off/all").then((r) => r.data.data ?? []);
 
 export const approveTimeOff = (id: string, status: TimeOffStatus, approverId = "admin") =>
   api
@@ -65,13 +65,13 @@ export const deleteTimeOff = (id: string) => api.delete(`/time-off/${id}`);
 export const fetchHoursSummary = (weekStart: string) =>
   api
     .get<{ success: true; data: HoursSummaryRow[] }>(`/reports/hours?weekStart=${weekStart}`)
-    .then((r) => r.data.data);
+    .then((r) => r.data.data ?? []);
 
 export const fetchViolations = (weekStart?: string) => {
   const qs = weekStart ? `?weekStart=${weekStart}` : "";
   return api
     .get<{ success: true; data: Violation[] }>(`/reports/violations${qs}`)
-    .then((r) => r.data.data);
+    .then((r) => r.data.data ?? []);
 };
 
 // ─── Coverage ─────────────────────────────────────────────────────────────────
@@ -79,4 +79,4 @@ export const fetchViolations = (weekStart?: string) => {
 export const fetchManagementGaps = (weekStart: string) =>
   api
     .get<{ success: true; data: ManagementGap[] }>(`/coverage/gaps?weekStart=${weekStart}`)
-    .then((r) => r.data.data);
+    .then((r) => r.data.data ?? []);
