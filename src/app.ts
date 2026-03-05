@@ -14,6 +14,7 @@ import cors from "cors";
 import { errorHandler } from "./api/errors.js";
 import { requestLog } from "./middleware/requestLog.js";
 import { requireAuth } from "./middleware/auth.js";
+import { authRouter } from "./routes/auth.js";
 import { healthRouter } from "./routes/health.js";
 import { scheduleRouter } from "./routes/schedule.js";
 import { employeeRouter } from "./routes/employees.js";
@@ -35,6 +36,7 @@ app.use(requestLog);
 
 // ─── Public routes ────────────────────────────────────────────────────────────
 app.use("/health", healthRouter);
+app.use("/api/auth", authRouter);
 
 // ─── Protected API routes ─────────────────────────────────────────────────────
 app.use("/api", requireAuth);
