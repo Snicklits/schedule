@@ -1,4 +1,6 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
+import jwt from "jsonwebtoken";
+import { z } from "zod";
 import type { TimeOffRequest, Assignment, ManagementTier } from "../src/constraintEngine/types.js";
 import { AssignmentStatus } from "../src/constraintEngine/types.js";
 import {
@@ -74,7 +76,18 @@ import {
   getAllPeakWindows,
   createPeakWindow,
   deletePeakWindow,
+  createSwapRequest,
+  getSwapRequestsByEmployee,
+  getSwapRequestById,
+  updateSwapStatus,
+  getShiftAssignmentsWithEmployees,
 } from "../src/repositories/index.js";
+import {
+  notifySwapRequested,
+  notifySwapDecision,
+} from "../src/services/notifications.js";
+
+const JWT_SECRET = process.env["JWT_SECRET"] ?? "dev-secret";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -88,6 +101,10 @@ function getWeekStartDate(date: Date): Date {
   const dow = d.getUTCDay();
   d.setUTCDate(d.getUTCDate() - ((dow + 6) % 7));
   return d;
+}
+
+function currentMondayDate(): Date {
+  return getWeekStartDate(new Date());
 }
 
 // ─── Resource handlers ────────────────────────────────────────────────────────
@@ -272,6 +289,94 @@ async function handleTimeOff(
   } else {
     methodNotAllowed(res);
   }
+}
+
+const createSwapSchema = z.object({
+  assignmentId: z.string().min(1),
+  targetEmployeeId: z.string().min(1),
+});
+
+const approveSwapSchema = z.object({
+  status: z.enum(["APPROVED", "DENIED"]),
+  managerNote: z.string().optional(),
+});
+
+async function handleSwaps(
+  req: VercelRequest,
+  res: VercelResponse,
+  auth: AuthPayload,
+  id?: string,
+  sub?: string
+): Promise<void> {
+  // POST /api/shifts/swap — create swap request
+  if (!id) {
+    if (req.method !== "POST") { methodNotAllowed(res); return; }
+    const { assignmentId, targetEmployeeId } = parseBody(createSwapSchema, req);
+    const assignment = await getAssignmentWithDetails(assignmentId);
+    if (!assignment) throw new ApiError(404, "NOT_FOUND", "Assignment not found");
+    if (assignment.employee_id === targetEmployeeId) {
+      throw new ApiError(400, "INVALID_SWAP", "Cannot swap with yourself");
+    }
+    const swap = await createSwapRequest({
+      requester_id: assignment.employee_id,
+      target_employee_id: targetEmployeeId,
+      assignment_id: assignmentId,
+    });
+    void notifySwapRequested(
+      { name: swap.target_employee.name, email: swap.target_employee.email },
+      swap.requester.name,
+      assignment.shift.date.toISOString().slice(0, 10)
+    );
+    res.status(201).json({ success: true, data: swap });
+    return;
+  }
+
+  // PUT /api/shifts/swap/:id/approve
+  if (sub === "approve") {
+    if (req.method !== "PUT") { methodNotAllowed(res); return; }
+    const { status, managerNote } = parseBody(approveSwapSchema, req);
+    const swap = await getSwapRequestById(id);
+    if (!swap) throw new ApiError(404, "NOT_FOUND", "Swap request not found");
+    if (swap.status !== "PENDING") {
+      throw new ApiError(409, "ALREADY_RESOLVED", "This swap request has already been resolved");
+    }
+    if (status === "APPROVED") {
+      const requesterTier = swap.requester.management_tier;
+      const targetTier = swap.target_employee.management_tier;
+      if (requesterTier !== "STAFF" || targetTier !== "STAFF") {
+        const shiftAssignments = await getShiftAssignmentsWithEmployees(swap.assignment.shift_id);
+        const tiersAfterSwap = shiftAssignments
+          .filter((a) => a.employee_id !== swap.requester_id)
+          .map((a) => a.employee.management_tier as string);
+        tiersAfterSwap.push(swap.target_employee.management_tier);
+        const shift = swap.assignment.shift;
+        if (shift.requires_management_presence) {
+          const hasMgmt = tiersAfterSwap.some((t) => t === "MANAGER" || t === "ASSISTANT_MANAGER");
+          if (!hasMgmt) {
+            throw new ApiError(409, "MANAGEMENT_COVERAGE_UNSAFE", "Approving this swap would remove management coverage from the shift", {
+              shiftId: swap.assignment.shift_id,
+              date: shift.date.toISOString().slice(0, 10),
+            });
+          }
+        }
+      }
+      await reassignAssignment(swap.assignment_id, swap.target_employee_id);
+    }
+    const updated = await updateSwapStatus(swap.id, status, auth.sub, managerNote);
+    void notifySwapDecision(
+      { name: swap.requester.name, email: swap.requester.email },
+      status,
+      swap.assignment.shift.date.toISOString().slice(0, 10),
+      managerNote
+    );
+    res.json({ success: true, data: updated });
+    return;
+  }
+
+  // GET /api/shifts/swap/:employeeId
+  if (req.method !== "GET") { methodNotAllowed(res); return; }
+  const swaps = await getSwapRequestsByEmployee(id);
+  res.json({ success: true, data: swaps });
 }
 
 async function handleSchedule(
@@ -465,6 +570,76 @@ async function handleScheduleRuns(req: VercelRequest, res: VercelResponse, id?: 
   }
 }
 
+const portalTimeOffSchema = z.object({
+  type: z.enum(["VACATION", "SICK", "PERSONAL", "UNPAID"]),
+  startDate: z.string().min(1),
+  endDate: z.string().min(1),
+  priority: z.number().int().min(0).optional().default(0),
+});
+
+const portalWeekQuery = z.object({ weekStart: z.string().min(1).optional() });
+
+async function handlePortal(
+  req: VercelRequest,
+  res: VercelResponse,
+  auth: AuthPayload,
+  seg1?: string
+): Promise<void> {
+  const employeeId = auth.sub;
+
+  if (seg1 === "schedule") {
+    if (req.method !== "GET") { methodNotAllowed(res); return; }
+    const { weekStart: ws } = parseQuery(portalWeekQuery, req);
+    const weekStart = ws ? parseWeekStart(ws) : currentMondayDate();
+    const allAssignments = await getAssignmentsForWeekWithDetails(weekStart);
+    res.json({ success: true, data: allAssignments.filter((a) => a.employee_id === employeeId) });
+    return;
+  }
+
+  if (seg1 === "time-off") {
+    if (req.method === "GET") {
+      res.json({ success: true, data: await getRequestsByEmployee(employeeId) });
+    } else if (req.method === "POST") {
+      const body = parseBody(portalTimeOffSchema, req);
+      const request = await createTimeOffRequest({
+        employee_id: employeeId,
+        type: body.type,
+        start_date: new Date(body.startDate),
+        end_date: new Date(body.endDate),
+        priority: body.priority,
+      });
+      res.status(201).json({ success: true, data: request });
+    } else {
+      methodNotAllowed(res);
+    }
+    return;
+  }
+
+  if (seg1 === "hours") {
+    if (req.method !== "GET") { methodNotAllowed(res); return; }
+    const { weekStart: ws } = parseQuery(portalWeekQuery, req);
+    const weekStart = ws ? parseWeekStart(ws) : currentMondayDate();
+    const allAssignments = await getAssignmentsForWeekWithDetails(weekStart);
+    const mine = allAssignments.filter((a) => a.employee_id === employeeId);
+    const weeklyHours = mine.reduce((sum, a) => sum + a.assigned_hours, 0);
+    const employee = await getEmployeeById(employeeId).catch(() => null);
+    res.json({
+      success: true,
+      data: {
+        employeeId,
+        name: employee?.name ?? "Unknown",
+        weeklyHours,
+        isAtCap: weeklyHours >= 40,
+        targetHours: employee?.weekly_hours_target ?? 40,
+        assignments: mine,
+      },
+    });
+    return;
+  }
+
+  res.status(404).json({ success: false, error: { code: "NOT_FOUND", message: "Portal route not found" } });
+}
+
 async function handlePeakWindows(req: VercelRequest, res: VercelResponse, id?: string): Promise<void> {
   if (!id) {
     if (req.method === "GET") {
@@ -523,10 +698,18 @@ async function handleAssignments(req: VercelRequest, res: VercelResponse, id?: s
 export default withHandler(async (req: VercelRequest, res: VercelResponse) => {
   const rawPath = req.query["path"];
   const segments = Array.isArray(rawPath) ? rawPath : rawPath ? [rawPath] : [];
-  const [resource, seg1, seg2] = segments;
+  const [resource, seg1, seg2, seg3] = segments;
 
   if (resource === "health") {
     res.json({ success: true, status: "ok", timestamp: new Date().toISOString() });
+    return;
+  }
+
+  // Auth token endpoint must be handled before requireAuth
+  if (resource === "auth" && seg1 === "token" && req.method === "POST") {
+    const { sub = "dev-admin", role = "ADMIN" } = (req.body ?? {}) as { sub?: string; role?: string };
+    const token = jwt.sign({ sub, role }, JWT_SECRET, { expiresIn: "8h" });
+    res.json({ token });
     return;
   }
 
@@ -534,7 +717,9 @@ export default withHandler(async (req: VercelRequest, res: VercelResponse) => {
 
   switch (resource) {
     case "employees":       return handleEmployees(req, res, seg1);
-    case "shifts":          return handleShifts(req, res, seg1, seg2);
+    case "shifts":
+      if (seg1 === "swap") return handleSwaps(req, res, auth, seg2, seg3);
+      return handleShifts(req, res, seg1, seg2);
     case "time-off":        return handleTimeOff(req, res, seg1, seg2);
     case "schedule":        return handleSchedule(req, res, auth, seg1, seg2);
     case "coverage":        return handleCoverage(req, res, seg1, seg2);
@@ -543,6 +728,7 @@ export default withHandler(async (req: VercelRequest, res: VercelResponse) => {
     case "schedule-runs":   return handleScheduleRuns(req, res, seg1);
     case "peak-windows":    return handlePeakWindows(req, res, seg1);
     case "assignments":     return handleAssignments(req, res, seg1);
+    case "portal":          return handlePortal(req, res, auth, seg1);
     default:
       res.status(404).json({ success: false, error: { code: "NOT_FOUND", message: "Route not found" } });
   }
