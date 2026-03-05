@@ -1,29 +1,31 @@
 /**
- * Auth — dev JWT helpers.
- * In production, swap mintAndStoreToken() with a real auth server call.
+ * Auth — JWT helpers.
+ * Tokens are issued by the server so they are signed with the real JWT_SECRET.
  */
 
-import { SignJWT, decodeJwt } from "jose";
+import { decodeJwt } from "jose";
 
 const STORAGE_KEY = "schedule_dev_token";
-const SECRET = new TextEncoder().encode("dev-secret");
 
-async function mintToken(sub: string, role: string): Promise<string> {
-  return new SignJWT({ sub, role })
-    .setProtectedHeader({ alg: "HS256" })
-    .setIssuedAt()
-    .setExpirationTime("8h")
-    .sign(SECRET);
+async function fetchServerToken(sub: string, role: string): Promise<string> {
+  const res = await fetch("/api/auth/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ sub, role }),
+  });
+  if (!res.ok) throw new Error("Failed to obtain auth token");
+  const { token } = (await res.json()) as { token: string };
+  return token;
 }
 
-/** Mints a new token for the given identity and caches it in localStorage. */
+/** Fetches a server-signed token for the given identity and caches it in localStorage. */
 export async function mintAndStoreToken(sub: string, role: string): Promise<string> {
-  const token = await mintToken(sub, role);
+  const token = await fetchServerToken(sub, role);
   localStorage.setItem(STORAGE_KEY, token);
   return token;
 }
 
-/** Returns the cached token (for API interceptor). Mints an ADMIN token if none exists. */
+/** Returns the cached token (for API interceptor). Fetches from server if none exists. */
 export async function getToken(): Promise<string> {
   const stored = localStorage.getItem(STORAGE_KEY);
   if (stored) return stored;
