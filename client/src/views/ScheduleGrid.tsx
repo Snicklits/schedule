@@ -154,7 +154,10 @@ export function ScheduleGrid() {
         setEmployees(emps);
         setHoursSummary(hours);
       })
-      .catch(() => setError("Failed to load schedule"))
+      .catch((err: unknown) => {
+        const e = err as { response?: { data?: { error?: { message?: string } } }; message?: string };
+        setError(e.response?.data?.error?.message ?? e.message ?? "Failed to load schedule");
+      })
       .finally(() => setLoading(false));
   }, [weekStart]);
 
