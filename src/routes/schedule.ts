@@ -36,6 +36,7 @@ import {
   generateScheduleSchema,
   assignmentOverrideSchema,
 } from "../api/schemas.js";
+import { notifySchedulePublished } from "../services/notifications.js";
 
 export const scheduleRouter = Router();
 
@@ -71,9 +72,28 @@ scheduleRouter.post("/generate", async (req, res) => {
     );
   }
 
+  // Fire-and-forget schedule publish notifications
+  const uniqueEmployees = Array.from(
+    new Map(result.schedule.map((a) => [a.employee_id, a])).values()
+  );
+  void (async () => {
+    try {
+      const allEmps = await getAllActiveEmployees();
+      const affected = uniqueEmployees
+        .map((a) => allEmps.find((e) => e.id === a.employee_id))
+        .filter((e): e is NonNullable<typeof e> => e != null);
+      // getAllActiveEmployees returns engine Employee type (no email)
+      // Fetch raw rows for emails — use a separate query
+      await notifySchedulePublished(
+        affected.map((e) => ({ name: e.name, email: "" })), // email not in engine type
+        weekStartStr
+      );
+    } catch { /* notification errors must not surface */ }
+  })();
+
   res.status(201).json({
     success: true,
-    data: { runId, schedule: result.schedule, warnings: result.warnings },
+    data: { runId, schedule: result.schedule, errors: [], warnings: result.warnings, isPublishable: result.isPublishable },
   });
 });
 

@@ -90,3 +90,57 @@ export const markShiftPeak = (id: string, isPeak: boolean) =>
   api
     .put<{ success: true; data: import("./types.js").Shift }>(`/shifts/${id}/mark-peak`, { isPeak })
     .then((r) => r.data.data);
+
+// ─── Portal (employee self-service) ───────────────────────────────────────────
+
+export const fetchPortalSchedule = (weekStart?: string) => {
+  const qs = weekStart ? `?weekStart=${weekStart}` : "";
+  return api
+    .get<{ success: true; data: import("./types.js").AssignmentWithDetails[] }>(`/portal/schedule${qs}`)
+    .then((r) => r.data.data ?? []);
+};
+
+export const fetchPortalTimeOff = () =>
+  api
+    .get<{ success: true; data: import("./types.js").TimeOffRequest[] }>("/portal/time-off")
+    .then((r) => r.data.data ?? []);
+
+export const submitPortalTimeOff = (body: {
+  type: string;
+  startDate: string;
+  endDate: string;
+  priority?: number;
+}) =>
+  api
+    .post<{ success: true; data: import("./types.js").TimeOffRequest }>("/portal/time-off", body)
+    .then((r) => r.data.data);
+
+export const fetchPortalHours = (weekStart?: string) => {
+  const qs = weekStart ? `?weekStart=${weekStart}` : "";
+  return api
+    .get<{ success: true; data: import("./types.js").PortalHoursSummary }>(`/portal/hours${qs}`)
+    .then((r) => r.data.data);
+};
+
+// ─── Shift Swaps ──────────────────────────────────────────────────────────────
+
+export const submitSwapRequest = (assignmentId: string, targetEmployeeId: string) =>
+  api
+    .post<{ success: true; data: import("./types.js").ShiftSwapRequest }>("/shifts/swap", {
+      assignmentId,
+      targetEmployeeId,
+    })
+    .then((r) => r.data.data);
+
+export const fetchSwapRequests = (employeeId: string) =>
+  api
+    .get<{ success: true; data: import("./types.js").ShiftSwapRequest[] }>(`/shifts/swap/${employeeId}`)
+    .then((r) => r.data.data ?? []);
+
+export const approveSwapRequest = (id: string, status: "APPROVED" | "DENIED", managerNote?: string) =>
+  api
+    .put<{ success: true; data: import("./types.js").ShiftSwapRequest }>(`/shifts/swap/${id}/approve`, {
+      status,
+      ...(managerNote && { managerNote }),
+    })
+    .then((r) => r.data.data);

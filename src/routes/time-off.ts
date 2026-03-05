@@ -30,6 +30,9 @@ import {
   approveTimeOffSchema,
   timeOffQuerySchema,
 } from "../api/schemas.js";
+import {
+  notifyTimeOffDecision,
+} from "../services/notifications.js";
 
 export const timeOffRouter = Router();
 
@@ -84,6 +87,13 @@ timeOffRouter.put("/:id/approve", async (req, res) => {
   // DENIED never requires a coverage check
   if (status === "DENIED") {
     const updated = await updateRequestStatus(id, "DENIED");
+    // Fire-and-forget notification
+    void notifyTimeOffDecision(
+      { name: rawRequest.employee.name, email: rawRequest.employee.email },
+      "DENIED",
+      rawRequest.start_date.toISOString().slice(0, 10),
+      rawRequest.end_date.toISOString().slice(0, 10)
+    );
     return res.json({ success: true, data: updated });
   }
 
@@ -121,6 +131,13 @@ timeOffRouter.put("/:id/approve", async (req, res) => {
   }
 
   const updated = await updateRequestStatus(id, "APPROVED");
+  // Fire-and-forget notification
+  void notifyTimeOffDecision(
+    { name: rawRequest.employee.name, email: rawRequest.employee.email },
+    "APPROVED",
+    rawRequest.start_date.toISOString().slice(0, 10),
+    rawRequest.end_date.toISOString().slice(0, 10)
+  );
   res.json({ success: true, data: updated });
 });
 

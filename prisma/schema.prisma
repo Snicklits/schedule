@@ -90,9 +90,11 @@ model Employee {
   specialties         String[]
   status              EmployeeStatus
 
-  time_off_requests     TimeOffRequest[]
-  assignments           Assignment[]
-  constraint_violations ConstraintViolation[] @relation("ViolationEmployee")
+  time_off_requests       TimeOffRequest[]
+  assignments             Assignment[]
+  constraint_violations   ConstraintViolation[] @relation("ViolationEmployee")
+  swap_requests_sent      ShiftSwapRequest[]    @relation("SwapRequester")
+  swap_requests_received  ShiftSwapRequest[]    @relation("SwapTarget")
 }
 
 model Shift {
@@ -131,8 +133,9 @@ model Assignment {
   status         AssignmentStatus
   assigned_hours Float
 
-  employee Employee @relation(fields: [employee_id], references: [id])
-  shift    Shift    @relation(fields: [shift_id], references: [id])
+  employee      Employee            @relation(fields: [employee_id], references: [id])
+  shift         Shift               @relation(fields: [shift_id], references: [id])
+  swap_requests ShiftSwapRequest[]
 }
 
 model ScheduleConfig {
@@ -183,4 +186,26 @@ model ConstraintViolation {
   schedule_run ScheduleRun @relation(fields: [schedule_run_id], references: [id])
   shift        Shift?      @relation("ViolationShift", fields: [shift_id], references: [id])
   employee     Employee?   @relation("ViolationEmployee", fields: [employee_id], references: [id])
+}
+
+enum SwapStatus {
+  PENDING
+  APPROVED
+  DENIED
+}
+
+model ShiftSwapRequest {
+  id                 String     @id @default(cuid())
+  requester_id       String
+  target_employee_id String
+  assignment_id      String
+  status             SwapStatus @default(PENDING)
+  manager_note       String?
+  created_at         DateTime   @default(now())
+  reviewed_at        DateTime?
+  reviewed_by        String?
+
+  requester       Employee   @relation("SwapRequester", fields: [requester_id], references: [id])
+  target_employee Employee   @relation("SwapTarget", fields: [target_employee_id], references: [id])
+  assignment      Assignment @relation(fields: [assignment_id], references: [id])
 }

@@ -22,6 +22,8 @@ import { shiftRouter } from "./routes/shifts.js";
 import { coverageRouter } from "./routes/coverage.js";
 import { reportsRouter } from "./routes/reports.js";
 import { peakWindowRouter } from "./routes/peakWindows.js";
+import { swapRouter } from "./routes/swap.js";
+import { portalRouter } from "./routes/portal.js";
 
 const app = express();
 
@@ -43,6 +45,8 @@ app.use("/api/shifts", shiftRouter);
 app.use("/api/coverage", coverageRouter);
 app.use("/api/reports", reportsRouter);
 app.use("/api/peak-windows", peakWindowRouter);
+app.use("/api/shifts/swap", swapRouter);
+app.use("/api/portal", portalRouter);
 
 // ─── Global error handler — must be last ──────────────────────────────────────
 app.use(errorHandler);

@@ -56,3 +56,16 @@ export function mintTestToken(
 ): string {
   return jwt.sign({ sub, role }, JWT_SECRET, { expiresIn: "1h" });
 }
+
+/** Throws 403 if the authenticated user does not have a manager-level role. */
+export function requireManagerRole(
+  req: Request,
+  _res: Response,
+  next: NextFunction
+): void {
+  const role = req.auth?.role ?? "";
+  if (!["ADMIN", "MANAGER", "ASSISTANT_MANAGER"].includes(role)) {
+    throw new ApiError(403, "FORBIDDEN", "Manager role required");
+  }
+  next();
+}

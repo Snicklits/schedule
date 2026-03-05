@@ -136,3 +136,33 @@ export interface CoverageCheckResult {
   peakWithoutManager: Array<{ shift: Shift; hasManager: boolean }>;
   isFullyCovered: boolean;
 }
+
+// ─── Shift Swap ───────────────────────────────────────────────────────────────
+
+export type SwapStatus = "PENDING" | "APPROVED" | "DENIED";
+
+export interface ShiftSwapRequest {
+  id: string;
+  requester_id: string;
+  target_employee_id: string;
+  assignment_id: string;
+  status: SwapStatus;
+  manager_note: string | null;
+  created_at: string;
+  reviewed_at: string | null;
+  reviewed_by: string | null;
+  requester: EmployeeWithStatus;
+  target_employee: EmployeeWithStatus;
+  assignment: AssignmentWithDetails;
+}
+
+// ─── Portal ───────────────────────────────────────────────────────────────────
+
+export interface PortalHoursSummary {
+  employeeId: string;
+  name: string;
+  weeklyHours: number;
+  isAtCap: boolean;
+  targetHours: number;
+  assignments: AssignmentWithDetails[];
+}
