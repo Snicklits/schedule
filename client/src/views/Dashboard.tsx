@@ -20,7 +20,7 @@ import { useToast } from "../contexts/ToastContext.js";
 import { StatusBadge } from "../components/StatusBadge.js";
 import {
   SEED_ASSIGNMENTS, SEED_HOURS, SEED_EMPLOYEES, SEED_TIME_OFF,
-  initials, tierGradient, tierLabel,
+  initials, tierGradient,
 } from "../data/seed.js";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
