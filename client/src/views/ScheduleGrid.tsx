@@ -21,8 +21,8 @@ const SPECIALTY_COLORS: Record<string, { bg: string; border: string }> = {
 };
 
 function specialtyColor(specialty: string | null) {
-  if (!specialty) return { bg: "bg-blue-50", border: "border-blue-200" };
-  return SPECIALTY_COLORS[specialty] ?? { bg: "bg-blue-50", border: "border-blue-200" };
+  if (!specialty) return { bg: "bg-slate-50", border: "border-slate-200" };
+  return SPECIALTY_COLORS[specialty] ?? { bg: "bg-slate-50", border: "border-slate-200" };
 }
 
 // ─── Coverage helpers ─────────────────────────────────────────────────────────
@@ -49,10 +49,10 @@ function coverageInfo(
 
   if (hasManager) {
     return {
-      borderCls: "border-green-400",
+      borderCls: "border-emerald-400",
       badge: (
-        <span className="text-xs bg-green-100 text-green-700 border border-green-300 rounded px-1">
-          🟢 MGR
+        <span className="text-xs bg-emerald-50 text-emerald-700 border border-emerald-300 rounded-full px-1.5 py-0.5">
+          MGR
         </span>
       ),
     };
@@ -61,18 +61,18 @@ function coverageInfo(
     return {
       borderCls: "border-blue-400",
       badge: (
-        <span className="text-xs bg-blue-100 text-blue-700 border border-blue-300 rounded px-1">
-          🔵 AM
+        <span className="text-xs bg-blue-50 text-blue-700 border border-blue-300 rounded-full px-1.5 py-0.5">
+          AM
         </span>
       ),
     };
   }
   if (hasAM && isPeak) {
     return {
-      borderCls: "border-yellow-400",
+      borderCls: "border-amber-400",
       badge: (
-        <span className="text-xs bg-yellow-50 text-yellow-700 border border-yellow-400 rounded px-1">
-          🟡 ⚠ Peak/AM
+        <span className="text-xs bg-amber-50 text-amber-700 border border-amber-400 rounded-full px-1.5 py-0.5">
+          Peak/AM
         </span>
       ),
     };
@@ -80,8 +80,8 @@ function coverageInfo(
   return {
     borderCls: "border-red-400",
     badge: (
-      <span className="text-xs bg-red-50 text-red-700 border border-red-400 rounded px-1">
-        🔴 ⚠ No Mgmt
+      <span className="text-xs bg-red-50 text-red-700 border border-red-400 rounded-full px-1.5 py-0.5">
+        No Mgmt
       </span>
     ),
   };
@@ -143,7 +143,7 @@ export function ScheduleGrid() {
   const [reason, setReason] = useState("");
   const [saving, setSaving] = useState(false);
   const [coverageWarning, setCoverageWarning] = useState<string | null>(null);
-  const [dragOverCell, setDragOverCell] = useState<string | null>(null); // "empId|date"
+  const [dragOverCell, setDragOverCell] = useState<string | null>(null);
   const { showToast } = useToast();
 
   const load = useCallback(() => {
@@ -168,7 +168,6 @@ export function ScheduleGrid() {
   ).sort((a, b) => a.hierarchy_rank - b.hierarchy_rank);
 
   const dayDates = DAYS.map((_, i) => addDays(weekStart, i));
-
   const hoursMap = new Map(hoursSummary.map((r) => [r.employeeId, r]));
 
   function openDrawer(assignment: AssignmentWithDetails, preselectedEmployeeId?: string) {
@@ -206,8 +205,6 @@ export function ScheduleGrid() {
     }
   }
 
-  // ─── Drag-and-drop handlers ─────────────────────────────────────────────────
-
   function handleDragStart(e: React.DragEvent, assignment: AssignmentWithDetails) {
     e.dataTransfer.setData(
       "text/plain",
@@ -234,7 +231,7 @@ export function ScheduleGrid() {
         assignmentId: string;
         sourceEmpId: string;
       };
-      if (sourceEmpId === targetEmpId) return; // same employee — no-op
+      if (sourceEmpId === targetEmpId) return;
       const assignment = assignments.find((a) => a.id === assignmentId);
       if (!assignment) return;
       openDrawer(assignment, targetEmpId);
@@ -243,157 +240,172 @@ export function ScheduleGrid() {
     }
   }
 
+  const inputCls = "w-full h-9 px-3 rounded-xl border border-slate-200 text-sm text-slate-800 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:bg-white transition-all";
+
   return (
-    <div className="p-4 space-y-4">
-      <div className="flex items-center gap-4">
-        <h1 className="text-2xl font-bold text-gray-800">Weekly Schedule</h1>
-        <input
-          type="date"
-          value={weekStart}
-          onChange={(e) => setWeekStart(e.target.value)}
-          className="border rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
-        <button onClick={load} className="text-xs text-blue-600 hover:text-blue-800">
-          Refresh
-        </button>
+    <div className="space-y-4">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-lg font-bold text-slate-900">Weekly Schedule</h2>
+          <p className="text-xs text-slate-400 mt-0.5">Drag shifts to reassign · click to edit</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <input
+            type="date"
+            value={weekStart}
+            onChange={(e) => setWeekStart(e.target.value)}
+            className="h-8 px-3 rounded-xl border border-slate-200 text-sm text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300 transition-all"
+          />
+          <button
+            onClick={load}
+            className="h-8 px-3 rounded-xl text-xs font-medium text-indigo-600 hover:bg-indigo-50 border border-indigo-200 transition-all duration-150"
+          >
+            Refresh
+          </button>
+        </div>
       </div>
 
       {/* Specialty legend */}
-      <div className="flex flex-wrap gap-2 text-xs">
+      <div className="flex flex-wrap gap-1.5">
         {Object.entries(SPECIALTY_COLORS).map(([label, cls]) => (
-          <span key={label} className={`px-2 py-0.5 rounded border ${cls.bg} ${cls.border} text-gray-600`}>
+          <span key={label} className={`px-2 py-0.5 rounded-full border text-xs font-medium ${cls.bg} ${cls.border} text-slate-600`}>
             {label}
           </span>
         ))}
-        <span className="px-2 py-0.5 rounded border bg-blue-50 border-blue-200 text-gray-600">General</span>
+        <span className="px-2 py-0.5 rounded-full border bg-slate-50 border-slate-200 text-xs font-medium text-slate-600">General</span>
       </div>
 
       {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
 
-      {loading ? (
-        <p className="text-gray-400 text-sm">Loading…</p>
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="min-w-full text-xs border-collapse">
-            <thead>
-              <tr className="bg-gray-100">
-                <th className="border px-3 py-2 text-left font-semibold text-gray-600 min-w-[180px]">
-                  Employee
-                </th>
-                {DAYS.map((day, i) => (
-                  <th key={day} className="border px-2 py-2 text-center font-semibold text-gray-600 min-w-[130px]">
-                    <div>{day}</div>
-                    <div className="text-gray-400 font-normal">{dayDates[i].slice(5)}</div>
+      {/* Schedule table */}
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+        {loading ? (
+          <div className="flex items-center justify-center h-40 text-sm text-slate-400">Loading…</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-xs border-collapse">
+              <thead>
+                <tr className="bg-slate-50 border-b border-slate-100">
+                  <th className="px-4 py-3 text-left font-semibold text-slate-500 min-w-[180px] uppercase tracking-wide text-[10px]">
+                    Employee
                   </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y">
-              {scheduleEmployees.length === 0 && (
-                <tr>
-                  <td colSpan={8} className="border px-4 py-6 text-center text-gray-400">
-                    No assignments for this week
-                  </td>
+                  {DAYS.map((day, i) => (
+                    <th key={day} className="px-2 py-3 text-center font-semibold text-slate-500 min-w-[130px] uppercase tracking-wide text-[10px]">
+                      <div>{day}</div>
+                      <div className="text-slate-400 font-normal normal-case text-[10px]">{dayDates[i].slice(5)}</div>
+                    </th>
+                  ))}
                 </tr>
-              )}
-              {scheduleEmployees.map((emp) => {
-                const streak = computeStreak(emp.id, assignments, weekStart);
-                const streakDot = streak >= 5 ? "🔴" : streak >= 4 ? "🟡" : null;
-                const hoursRow = hoursMap.get(emp.id);
-                const nearCap = hoursRow && (hoursRow.isAtCap || hoursRow.weeklyHours >= 35);
-                const atCap = hoursRow?.isAtCap;
-
-                return (
-                  <tr
-                    key={emp.id}
-                    className={atCap ? "bg-red-50" : nearCap ? "bg-yellow-50" : "hover:bg-gray-50"}
-                  >
-                    <td className="border px-3 py-2">
-                      <div className="flex items-center gap-1">
-                        <span className={`font-medium ${atCap ? "text-red-700" : nearCap ? "text-yellow-700" : "text-gray-800"}`}>
-                          {emp.name}
-                        </span>
-                        {streakDot && <span title={`${streak}-day streak`}>{streakDot}</span>}
-                        {atCap && (
-                          <span className="text-xs bg-red-100 text-red-700 border border-red-300 rounded px-1 ml-1">
-                            AT CAP
-                          </span>
-                        )}
-                        {!atCap && nearCap && (
-                          <span className="text-xs bg-yellow-100 text-yellow-700 border border-yellow-300 rounded px-1 ml-1">
-                            NEAR CAP
-                          </span>
-                        )}
-                      </div>
-                      <div className="text-gray-400 text-xs">{emp.management_tier.replace("_", " ")}</div>
-                      {hoursRow && (
-                        <div className="text-gray-400 text-xs">{hoursRow.weeklyHours}h this week</div>
-                      )}
+              </thead>
+              <tbody className="divide-y divide-slate-50">
+                {scheduleEmployees.length === 0 && (
+                  <tr>
+                    <td colSpan={8} className="px-4 py-10 text-center text-slate-400 text-sm">
+                      No assignments for this week
                     </td>
-                    {dayDates.map((date) => {
-                      const cellKey = `${emp.id}|${date}`;
-                      const isDragOver = dragOverCell === cellKey;
-                      const dayAssignments = assignments.filter(
-                        (a) => a.employee_id === emp.id && a.shift.date.slice(0, 10) === date
-                      );
-
-                      return (
-                        <td
-                          key={date}
-                          className={`border px-1 py-1 align-top transition-colors ${
-                            isDragOver ? "bg-blue-100" : ""
-                          }`}
-                          onDragOver={(e) => handleDragOver(e, emp.id, date)}
-                          onDragLeave={handleDragLeave}
-                          onDrop={(e) => handleDrop(e, emp.id)}
-                        >
-                          {dayAssignments.map((asgn) => {
-                            const { borderCls, badge } = coverageInfo(
-                              assignments,
-                              asgn.shift_id,
-                              asgn.shift.requires_management_presence,
-                              asgn.shift.is_peak_shift
-                            );
-                            const { bg, border } = specialtyColor(asgn.shift.required_specialty);
-                            // Coverage border overrides specialty border when there's an issue
-                            const finalBorder = borderCls || border;
-
-                            return (
-                              <div
-                                key={asgn.id}
-                                draggable
-                                onDragStart={(e) => handleDragStart(e, asgn)}
-                                onClick={() => openDrawer(asgn)}
-                                className={`cursor-grab active:cursor-grabbing rounded p-1 ${bg} hover:brightness-95 border-2 ${finalBorder} mb-1 space-y-0.5 select-none`}
-                                title={`${asgn.shift.required_specialty ?? "General"} — drag to reassign`}
-                              >
-                                <div className="text-gray-700">
-                                  {asgn.shift.start_time.slice(11, 16)}–{asgn.shift.end_time.slice(11, 16)}
-                                </div>
-                                {asgn.shift.required_specialty && (
-                                  <div className="text-gray-500 truncate">{asgn.shift.required_specialty}</div>
-                                )}
-                                <div className="flex flex-wrap gap-1">
-                                  {badge}
-                                  {asgn.shift.is_peak_shift && (
-                                    <span className="text-xs bg-orange-100 text-orange-700 border border-orange-200 rounded px-1">
-                                      ★ Peak
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </td>
-                      );
-                    })}
                   </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
+                )}
+                {scheduleEmployees.map((emp) => {
+                  const streak = computeStreak(emp.id, assignments, weekStart);
+                  const streakWarn = streak >= 5 ? "text-red-500" : streak >= 4 ? "text-amber-500" : null;
+                  const hoursRow = hoursMap.get(emp.id);
+                  const nearCap = hoursRow && (hoursRow.isAtCap || hoursRow.weeklyHours >= 35);
+                  const atCap = hoursRow?.isAtCap;
+
+                  return (
+                    <tr
+                      key={emp.id}
+                      className={`transition-colors ${atCap ? "bg-red-50/40" : nearCap ? "bg-amber-50/40" : "hover:bg-slate-50/60"}`}
+                    >
+                      <td className="px-4 py-2.5 border-r border-slate-50">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className={`font-semibold text-sm ${atCap ? "text-red-700" : nearCap ? "text-amber-700" : "text-slate-800"}`}>
+                            {emp.name}
+                          </span>
+                          {streakWarn && (
+                            <span className={`text-[10px] font-bold ${streakWarn}`} title={`${streak}-day streak`}>
+                              {streak}d
+                            </span>
+                          )}
+                          {atCap && (
+                            <span className="text-[10px] font-bold bg-red-100 text-red-700 rounded-full px-1.5 py-0.5">
+                              AT CAP
+                            </span>
+                          )}
+                          {!atCap && nearCap && (
+                            <span className="text-[10px] font-bold bg-amber-100 text-amber-700 rounded-full px-1.5 py-0.5">
+                              NEAR CAP
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-[10px] text-slate-400 mt-0.5">{emp.management_tier.replace("_", " ")}</div>
+                        {hoursRow && (
+                          <div className="text-[10px] text-slate-400">{hoursRow.weeklyHours}h this week</div>
+                        )}
+                      </td>
+                      {dayDates.map((date) => {
+                        const cellKey = `${emp.id}|${date}`;
+                        const isDragOver = dragOverCell === cellKey;
+                        const dayAssignments = assignments.filter(
+                          (a) => a.employee_id === emp.id && a.shift.date.slice(0, 10) === date
+                        );
+
+                        return (
+                          <td
+                            key={date}
+                            className={`px-1.5 py-1.5 align-top transition-colors ${isDragOver ? "bg-indigo-50" : ""}`}
+                            onDragOver={(e) => handleDragOver(e, emp.id, date)}
+                            onDragLeave={handleDragLeave}
+                            onDrop={(e) => handleDrop(e, emp.id)}
+                          >
+                            {dayAssignments.map((asgn) => {
+                              const { borderCls, badge } = coverageInfo(
+                                assignments,
+                                asgn.shift_id,
+                                asgn.shift.requires_management_presence,
+                                asgn.shift.is_peak_shift
+                              );
+                              const { bg, border } = specialtyColor(asgn.shift.required_specialty);
+                              const finalBorder = borderCls || border;
+
+                              return (
+                                <div
+                                  key={asgn.id}
+                                  draggable
+                                  onDragStart={(e) => handleDragStart(e, asgn)}
+                                  onClick={() => openDrawer(asgn)}
+                                  className={`cursor-grab active:cursor-grabbing rounded-lg p-1.5 ${bg} hover:brightness-95 border-2 ${finalBorder} mb-1 space-y-0.5 select-none transition-all duration-150`}
+                                  title={`${asgn.shift.required_specialty ?? "General"} — drag to reassign`}
+                                >
+                                  <div className="text-slate-700 font-medium">
+                                    {asgn.shift.start_time.slice(11, 16)}–{asgn.shift.end_time.slice(11, 16)}
+                                  </div>
+                                  {asgn.shift.required_specialty && (
+                                    <div className="text-slate-500 truncate text-[10px]">{asgn.shift.required_specialty}</div>
+                                  )}
+                                  <div className="flex flex-wrap gap-1">
+                                    {badge}
+                                    {asgn.shift.is_peak_shift && (
+                                      <span className="text-[10px] bg-orange-50 text-orange-700 border border-orange-200 rounded-full px-1.5 py-0.5">
+                                        Peak
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
 
       {drawer && (
         <Modal
@@ -403,14 +415,14 @@ export function ScheduleGrid() {
             <>
               <button
                 onClick={() => setDrawer(null)}
-                className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded text-sm"
+                className="h-9 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-medium transition-all duration-150"
               >
                 Cancel
               </button>
               <button
                 onClick={handleReassign}
                 disabled={saving || !newEmployeeId}
-                className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white px-4 py-2 rounded text-sm"
+                className="h-9 px-4 rounded-xl bg-gradient-to-r from-indigo-500 to-indigo-600 hover:opacity-90 disabled:opacity-50 text-white text-sm font-semibold transition-all duration-150 shadow-sm"
               >
                 {saving ? "Saving…" : "Reassign"}
               </button>
@@ -419,16 +431,16 @@ export function ScheduleGrid() {
         >
           <div className="space-y-3 text-sm">
             {coverageWarning && (
-              <p className="text-yellow-700 bg-yellow-50 border border-yellow-200 rounded p-2 text-xs">
-                ⚠ {coverageWarning}
+              <p className="text-amber-700 bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs">
+                {coverageWarning}
               </p>
             )}
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Assign To</label>
+              <label className="block text-xs font-semibold text-slate-600 mb-1.5">Assign To</label>
               <select
                 value={newEmployeeId}
                 onChange={(e) => setNewEmployeeId(e.target.value)}
-                className="w-full border rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                className={inputCls}
               >
                 <option value="">— Select employee —</option>
                 {employees.map((e) => (
@@ -439,7 +451,7 @@ export function ScheduleGrid() {
               </select>
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">
+              <label className="block text-xs font-semibold text-slate-600 mb-1.5">
                 Reason {coverageWarning ? "(required — coverage override)" : "(optional)"}
               </label>
               <textarea
@@ -447,7 +459,7 @@ export function ScheduleGrid() {
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
                 placeholder="Enter reason if overriding coverage…"
-                className="w-full border rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 resize-none"
+                className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm text-slate-800 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:bg-white transition-all resize-none"
               />
             </div>
           </div>

@@ -30,7 +30,6 @@ export function ScheduleGenerator() {
         setCoverageCheck(check);
         return check;
       } catch {
-        // Coverage check failure is non-blocking for viewing results
         setCoverageCheck(null);
         return null;
       } finally {
@@ -69,7 +68,6 @@ export function ScheduleGenerator() {
   }
 
   function handlePublish() {
-    // Navigate to the schedule grid for the generated week
     navigate(`/?week=${weekStart}`);
   }
 
@@ -87,25 +85,29 @@ export function ScheduleGenerator() {
         : "Publish this schedule";
 
   return (
-    <div className="max-w-2xl mx-auto py-10 px-4 space-y-6">
-      <h1 className="text-2xl font-bold text-gray-800">Generate Schedule</h1>
+    <div className="max-w-2xl mx-auto space-y-5">
+      <div>
+        <h2 className="text-lg font-bold text-slate-900">Generate Schedule</h2>
+        <p className="text-xs text-slate-400 mt-0.5">Auto-assign employees to shifts for the selected week</p>
+      </div>
 
-      <div className="bg-white rounded-lg border shadow-sm p-6 space-y-4">
+      {/* Config card */}
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 space-y-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Week Starting (Monday)</label>
+          <label className="block text-xs font-semibold text-slate-600 mb-1.5">Week Starting (Monday)</label>
           <input
             type="date"
             value={weekStart}
             onChange={(e) => setWeekStart(toMonday(e.target.value))}
-            className="border rounded px-3 py-2 text-sm w-full focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full h-10 px-4 rounded-xl border border-slate-200 text-sm text-slate-800 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:bg-white transition-all"
           />
-          <p className="text-xs text-gray-400 mt-1">Auto-snapped to Monday</p>
+          <p className="text-xs text-slate-400 mt-1">Auto-snapped to Monday</p>
         </div>
 
         <button
           onClick={handleGenerate}
           disabled={loading}
-          className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-medium py-2 rounded text-sm transition-colors"
+          className="w-full h-10 rounded-xl bg-gradient-to-r from-indigo-500 to-indigo-600 text-white text-sm font-semibold hover:opacity-90 disabled:opacity-50 transition-all shadow-sm"
         >
           {loading ? "Generating…" : "Generate Schedule"}
         </button>
@@ -114,29 +116,29 @@ export function ScheduleGenerator() {
       {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
 
       {result && (
-        <div
-          className={`rounded-lg border p-6 space-y-4 ${
-            result.isPublishable ? "bg-green-50 border-green-300" : "bg-red-50 border-red-300"
-          }`}
-        >
+        <div className={`bg-white rounded-2xl shadow-sm border p-6 space-y-4 ${
+          result.isPublishable ? "border-emerald-200" : "border-red-200"
+        }`}>
           {/* Status header */}
           <div className="flex items-center gap-3">
-            <span className={`text-2xl ${result.isPublishable ? "text-green-600" : "text-red-600"}`}>
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-white text-lg font-bold ${
+              result.isPublishable ? "bg-gradient-to-br from-emerald-400 to-emerald-500" : "bg-gradient-to-br from-red-400 to-red-500"
+            }`}>
               {result.isPublishable ? "✓" : "✗"}
-            </span>
+            </div>
             <div>
-              <p className="font-semibold text-gray-800">
+              <p className="font-semibold text-slate-800">
                 {result.isPublishable ? "Schedule Generated" : "Generation HALTED"}
               </p>
-              <p className="text-xs text-gray-500">Run ID: {result.runId}</p>
+              <p className="text-xs text-slate-400">Run ID: {result.runId}</p>
             </div>
           </div>
 
           {/* Errors */}
           {result.errors.length > 0 && (
-            <div className="space-y-1">
-              <p className="text-sm font-medium text-red-700">Errors ({result.errors.length}):</p>
-              <ul className="list-disc list-inside text-sm text-red-700 space-y-0.5">
+            <div className="bg-red-50 border border-red-100 rounded-xl p-4 space-y-1">
+              <p className="text-sm font-semibold text-red-700">Errors ({result.errors.length}):</p>
+              <ul className="list-disc list-inside text-sm text-red-600 space-y-0.5">
                 {result.errors.map((e, i) => (
                   <li key={i}>{e.reason}</li>
                 ))}
@@ -146,9 +148,9 @@ export function ScheduleGenerator() {
 
           {/* Warnings */}
           {result.warnings.length > 0 && (
-            <div className="space-y-1">
-              <p className="text-sm font-medium text-yellow-700">Warnings ({result.warnings.length}):</p>
-              <ul className="list-disc list-inside text-sm text-yellow-700 space-y-0.5">
+            <div className="bg-amber-50 border border-amber-100 rounded-xl p-4 space-y-1">
+              <p className="text-sm font-semibold text-amber-700">Warnings ({result.warnings.length}):</p>
+              <ul className="list-disc list-inside text-sm text-amber-600 space-y-0.5">
                 {result.warnings.map((w, i) => (
                   <li key={i}>{w}</li>
                 ))}
@@ -158,23 +160,23 @@ export function ScheduleGenerator() {
 
           {/* Coverage check result */}
           {result.isPublishable && (
-            <div className="border-t pt-3">
+            <div className="border-t border-slate-100 pt-4">
               {checkingCoverage && (
-                <p className="text-xs text-gray-400">Checking coverage…</p>
+                <p className="text-xs text-slate-400">Checking coverage…</p>
               )}
               {!checkingCoverage && coverageCheck && (
                 coverageCheck.isFullyCovered ? (
-                  <p className="text-sm text-green-700 font-medium">✓ Full management coverage confirmed</p>
+                  <p className="text-sm text-emerald-700 font-medium">✓ Full management coverage confirmed</p>
                 ) : (
                   <div className="space-y-1">
-                    <p className="text-sm font-medium text-red-700">Coverage gaps prevent publishing:</p>
+                    <p className="text-sm font-semibold text-red-700">Coverage gaps prevent publishing:</p>
                     {coverageCheck.managementGaps.length > 0 && (
                       <p className="text-xs text-red-600">
                         {coverageCheck.managementGaps.length} shift(s) without any management presence
                       </p>
                     )}
                     {coverageCheck.peakWithoutManager.length > 0 && (
-                      <p className="text-xs text-yellow-700">
+                      <p className="text-xs text-amber-700">
                         {coverageCheck.peakWithoutManager.length} peak shift(s) without a Manager (AM only)
                       </p>
                     )}
@@ -186,21 +188,21 @@ export function ScheduleGenerator() {
 
           {/* Assignment preview */}
           {result.isPublishable && result.schedule.length > 0 && (
-            <details className="border-t pt-3">
-              <summary className="text-sm font-medium text-gray-700 cursor-pointer select-none">
+            <details className="border-t border-slate-100 pt-4">
+              <summary className="text-sm font-semibold text-slate-700 cursor-pointer select-none">
                 Preview assignments ({result.schedule.length})
               </summary>
-              <div className="mt-2 max-h-48 overflow-y-auto space-y-1">
+              <div className="mt-3 max-h-48 overflow-y-auto space-y-1.5">
                 {result.schedule.map((a) => (
                   <div key={a.id} className="text-xs flex items-center gap-2 py-0.5">
-                    <span className="text-gray-500 w-20 shrink-0">{a.shift.date.slice(5)}</span>
-                    <span className="text-gray-500 w-24 shrink-0">
+                    <span className="text-slate-400 w-20 shrink-0">{a.shift.date.slice(5)}</span>
+                    <span className="text-slate-400 w-24 shrink-0">
                       {a.shift.start_time.slice(11, 16)}–{a.shift.end_time.slice(11, 16)}
                     </span>
-                    <span className="font-medium text-gray-800">{a.employee.name}</span>
-                    <span className="text-gray-400">({a.employee.management_tier.replace("_", " ")})</span>
+                    <span className="font-semibold text-slate-800">{a.employee.name}</span>
+                    <span className="text-slate-400">({a.employee.management_tier.replace("_", " ")})</span>
                     {a.shift.required_specialty && (
-                      <span className="text-gray-400">· {a.shift.required_specialty}</span>
+                      <span className="text-slate-400">· {a.shift.required_specialty}</span>
                     )}
                   </div>
                 ))}
@@ -209,10 +211,10 @@ export function ScheduleGenerator() {
           )}
 
           {/* Actions */}
-          <div className="flex gap-3 border-t pt-3">
+          <div className="flex gap-3 border-t border-slate-100 pt-4">
             <button
               onClick={handleDiscard}
-              className="bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-2 px-4 rounded text-sm"
+              className="h-9 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-medium transition-all duration-150"
             >
               Discard
             </button>
@@ -220,12 +222,12 @@ export function ScheduleGenerator() {
               <button
                 onClick={handlePublish}
                 disabled={publishBlocked}
-                className="bg-green-600 hover:bg-green-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-medium py-2 px-4 rounded text-sm"
+                className="h-9 px-4 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-semibold transition-all duration-150 shadow-sm"
               >
                 {checkingCoverage ? "Checking coverage…" : "Publish Schedule"}
               </button>
               {publishBlocked && (
-                <div className="absolute bottom-full left-0 mb-1 w-72 bg-gray-900 text-white text-xs rounded px-2 py-1 hidden group-hover:block z-10 pointer-events-none">
+                <div className="absolute bottom-full left-0 mb-1 w-72 bg-slate-900 text-white text-xs rounded-xl px-3 py-2 hidden group-hover:block z-10 pointer-events-none">
                   {publishTooltip}
                 </div>
               )}

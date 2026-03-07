@@ -40,36 +40,50 @@ export function PortalSchedule() {
 
   const dayDates = DAYS.map((_, i) => addDays(weekStart, i));
   const totalHours = assignments.reduce((s, a) => s + a.assigned_hours, 0);
+  const today = new Date().toISOString().slice(0, 10);
 
   return (
-    <div className="max-w-4xl mx-auto p-6 space-y-6">
+    <div className="max-w-4xl mx-auto space-y-5">
+      {/* Header */}
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-800">My Schedule</h1>
+        <div>
+          <h2 className="text-lg font-bold text-slate-900">My Schedule</h2>
+          <p className="text-xs text-slate-400 mt-0.5">Your upcoming shifts for the week</p>
+        </div>
         <input
           type="date"
           value={weekStart}
           onChange={(e) => setWeekStart(e.target.value)}
-          className="border rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="h-8 px-3 rounded-xl border border-slate-200 text-sm text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300 transition-all"
         />
       </div>
 
       {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
 
       {loading ? (
-        <p className="text-gray-400 text-sm">Loading your schedule…</p>
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 flex items-center justify-center h-40 text-sm text-slate-400">
+          Loading your schedule…
+        </div>
       ) : (
         <>
           {/* Summary bar */}
-          <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 flex items-center gap-4 text-sm">
-            <span className="font-medium text-blue-800">{assignments.length} shifts</span>
-            <span className="text-blue-600">{totalHours}h scheduled this week</span>
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-100 px-5 py-3 flex items-center gap-4">
+            <div className="flex items-baseline gap-1">
+              <span className="text-2xl font-bold text-slate-900">{assignments.length}</span>
+              <span className="text-sm text-slate-400">shifts</span>
+            </div>
+            <div className="w-px h-8 bg-slate-100" />
+            <div className="flex items-baseline gap-1">
+              <span className="text-2xl font-bold text-slate-900">{totalHours}</span>
+              <span className="text-sm text-slate-400">hours scheduled</span>
+            </div>
             {totalHours >= 40 && (
-              <span className="text-xs bg-red-100 text-red-700 border border-red-300 rounded px-2 py-0.5">
+              <span className="ml-auto h-6 px-3 flex items-center rounded-full bg-red-100 text-red-700 text-xs font-bold">
                 AT CAP
               </span>
             )}
             {totalHours >= 35 && totalHours < 40 && (
-              <span className="text-xs bg-yellow-100 text-yellow-700 border border-yellow-300 rounded px-2 py-0.5">
+              <span className="ml-auto h-6 px-3 flex items-center rounded-full bg-amber-100 text-amber-700 text-xs font-bold">
                 NEAR CAP
               </span>
             )}
@@ -79,37 +93,40 @@ export function PortalSchedule() {
           <div className="grid grid-cols-7 gap-2">
             {DAYS.map((day, i) => {
               const date = dayDates[i];
-              const dayShifts = assignments.filter(
-                (a) => a.shift.date.slice(0, 10) === date
-              );
-              const isToday = date === new Date().toISOString().slice(0, 10);
+              const dayShifts = assignments.filter((a) => a.shift.date.slice(0, 10) === date);
+              const isToday = date === today;
 
               return (
                 <div
                   key={day}
-                  className={`rounded-lg border p-2 min-h-[80px] ${
-                    isToday ? "border-blue-400 bg-blue-50" : "border-gray-200 bg-white"
+                  className={`rounded-2xl border p-2.5 min-h-[90px] transition-all ${
+                    isToday
+                      ? "border-indigo-300 bg-indigo-50/60 shadow-sm"
+                      : "border-slate-100 bg-white shadow-sm"
                   }`}
                 >
-                  <div className={`text-xs font-semibold mb-1 ${isToday ? "text-blue-700" : "text-gray-500"}`}>
+                  <div className={`text-xs font-semibold mb-1.5 ${isToday ? "text-indigo-700" : "text-slate-500"}`}>
                     {day}
-                    <span className="ml-1 font-normal">{date.slice(5)}</span>
+                    <span className="ml-1 font-normal text-[10px]">{date.slice(5)}</span>
+                    {isToday && (
+                      <span className="ml-1 inline-block w-1 h-1 rounded-full bg-indigo-500 align-middle" />
+                    )}
                   </div>
                   {dayShifts.length === 0 ? (
-                    <p className="text-xs text-gray-300 italic">Off</p>
+                    <p className="text-[10px] text-slate-300 italic">Off</p>
                   ) : (
                     dayShifts.map((a) => (
                       <div
                         key={a.id}
-                        className="text-xs bg-blue-100 text-blue-800 rounded p-1 mb-1"
+                        className="text-[10px] bg-indigo-100 text-indigo-800 rounded-lg p-1.5 mb-1 space-y-0.5"
                       >
-                        <div className="font-medium">
+                        <div className="font-semibold">
                           {fmt(a.shift.start_time)}–{fmt(a.shift.end_time)}
                         </div>
                         {a.shift.required_specialty && (
-                          <div className="text-blue-600">{a.shift.required_specialty}</div>
+                          <div className="text-indigo-600">{a.shift.required_specialty}</div>
                         )}
-                        <div className="text-blue-500">{a.assigned_hours}h</div>
+                        <div className="text-indigo-500">{a.assigned_hours}h</div>
                       </div>
                     ))
                   )}
@@ -119,7 +136,7 @@ export function PortalSchedule() {
           </div>
 
           {assignments.length === 0 && (
-            <p className="text-gray-400 text-sm italic text-center">
+            <p className="text-slate-400 text-sm italic text-center py-4">
               No shifts scheduled for this week.
             </p>
           )}

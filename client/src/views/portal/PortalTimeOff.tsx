@@ -12,10 +12,10 @@ const TYPE_LABELS: Record<string, string> = {
   UNPAID: "Unpaid",
 };
 
-const STATUS_COLORS: Record<string, string> = {
-  PENDING: "bg-yellow-100 text-yellow-700 border-yellow-300",
-  APPROVED: "bg-green-100 text-green-700 border-green-300",
-  DENIED: "bg-red-100 text-red-700 border-red-300",
+const STATUS_STYLES: Record<string, string> = {
+  PENDING:  "bg-amber-100 text-amber-700",
+  APPROVED: "bg-emerald-100 text-emerald-700",
+  DENIED:   "bg-red-100 text-red-600",
 };
 
 export function PortalTimeOff() {
@@ -72,13 +72,19 @@ export function PortalTimeOff() {
   const pending  = requests.filter((r) => r.status === "PENDING").length;
   const approved = requests.filter((r) => r.status === "APPROVED").length;
 
+  const inputCls = "w-full h-9 px-3 rounded-xl border border-slate-200 text-sm text-slate-800 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:bg-white transition-all";
+
   return (
-    <div className="max-w-2xl mx-auto p-6 space-y-6">
+    <div className="max-w-2xl mx-auto space-y-5">
+      {/* Header */}
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-800">My Time Off</h1>
+        <div>
+          <h2 className="text-lg font-bold text-slate-900">My Time Off</h2>
+          <p className="text-xs text-slate-400 mt-0.5">Request and track your time-off</p>
+        </div>
         <button
           onClick={() => setShowForm(true)}
-          className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded"
+          className="h-9 px-4 rounded-xl bg-gradient-to-r from-indigo-500 to-indigo-600 text-white text-sm font-semibold hover:opacity-90 transition-all duration-150 shadow-sm"
         >
           + Request Time Off
         </button>
@@ -86,52 +92,58 @@ export function PortalTimeOff() {
 
       {/* Stats */}
       {requests.length > 0 && (
-        <div className="flex gap-4 text-sm">
-          <span className="text-yellow-700 bg-yellow-50 border border-yellow-200 rounded px-3 py-1">
-            {pending} pending
-          </span>
-          <span className="text-green-700 bg-green-50 border border-green-200 rounded px-3 py-1">
-            {approved} approved
-          </span>
+        <div className="flex gap-3">
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-100 px-4 py-3 flex items-baseline gap-1.5">
+            <span className="text-xl font-bold text-amber-600">{pending}</span>
+            <span className="text-xs text-slate-400">pending</span>
+          </div>
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-100 px-4 py-3 flex items-baseline gap-1.5">
+            <span className="text-xl font-bold text-emerald-600">{approved}</span>
+            <span className="text-xs text-slate-400">approved</span>
+          </div>
         </div>
       )}
 
       {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
 
-      {loading ? (
-        <p className="text-gray-400 text-sm">Loading…</p>
-      ) : (
-        <div className="space-y-2">
-          {requests.length === 0 && (
-            <p className="text-gray-400 text-sm italic text-center py-8">
-              No time-off requests yet. Click "+ Request Time Off" to submit one.
-            </p>
-          )}
-          {requests.map((r) => (
+      {/* Request list */}
+      <div className="space-y-2">
+        {loading ? (
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-100 flex items-center justify-center h-32 text-sm text-slate-400">
+            Loading…
+          </div>
+        ) : requests.length === 0 ? (
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-100 flex flex-col items-center justify-center h-32 gap-2">
+            <p className="text-sm text-slate-400 italic">No time-off requests yet.</p>
+            <button
+              onClick={() => setShowForm(true)}
+              className="text-xs font-medium text-indigo-600 hover:text-indigo-800 transition-colors"
+            >
+              Submit your first request
+            </button>
+          </div>
+        ) : (
+          requests.map((r) => (
             <div
               key={r.id}
-              className="bg-white border rounded-lg p-4 flex items-center justify-between gap-4"
+              className="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 flex items-center justify-between gap-4 hover:shadow-md transition-all duration-150"
             >
               <div className="space-y-0.5">
-                <p className="font-medium text-gray-800">{TYPE_LABELS[r.type] ?? r.type}</p>
-                <p className="text-sm text-gray-500">
+                <p className="font-semibold text-slate-800">{TYPE_LABELS[r.type] ?? r.type}</p>
+                <p className="text-sm text-slate-500">
                   {r.start_date.slice(0, 10)} → {r.end_date.slice(0, 10)}
                 </p>
-                <p className="text-xs text-gray-400">
+                <p className="text-xs text-slate-400">
                   Submitted {r.created_at.slice(0, 10)}
                 </p>
               </div>
-              <span
-                className={`text-xs font-medium border rounded px-2 py-0.5 ${
-                  STATUS_COLORS[r.status] ?? "bg-gray-100 text-gray-600 border-gray-300"
-                }`}
-              >
+              <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${STATUS_STYLES[r.status] ?? "bg-slate-100 text-slate-600"}`}>
                 {r.status}
               </span>
             </div>
-          ))}
-        </div>
-      )}
+          ))
+        )}
+      </div>
 
       {showForm && (
         <Modal
@@ -141,14 +153,14 @@ export function PortalTimeOff() {
             <>
               <button
                 onClick={() => setShowForm(false)}
-                className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded text-sm"
+                className="h-9 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-medium transition-all duration-150"
               >
                 Cancel
               </button>
               <button
                 onClick={handleSubmit}
                 disabled={submitting}
-                className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white px-4 py-2 rounded text-sm"
+                className="h-9 px-4 rounded-xl bg-gradient-to-r from-indigo-500 to-indigo-600 hover:opacity-90 disabled:opacity-50 text-white text-sm font-semibold transition-all duration-150 shadow-sm"
               >
                 {submitting ? "Submitting…" : "Submit Request"}
               </button>
@@ -157,11 +169,11 @@ export function PortalTimeOff() {
         >
           <div className="space-y-4 text-sm">
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Type</label>
+              <label className="block text-xs font-semibold text-slate-600 mb-1.5">Type</label>
               <select
                 value={form.type}
                 onChange={(e) => setForm({ ...form, type: e.target.value })}
-                className="w-full border rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                className={inputCls}
               >
                 {Object.entries(TYPE_LABELS).map(([val, label]) => (
                   <option key={val} value={val}>{label}</option>
@@ -170,25 +182,25 @@ export function PortalTimeOff() {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Start Date</label>
+                <label className="block text-xs font-semibold text-slate-600 mb-1.5">Start Date</label>
                 <input
                   type="date"
                   value={form.startDate}
                   onChange={(e) => setForm({ ...form, startDate: e.target.value })}
-                  className="w-full border rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  className={inputCls}
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">End Date</label>
+                <label className="block text-xs font-semibold text-slate-600 mb-1.5">End Date</label>
                 <input
                   type="date"
                   value={form.endDate}
                   onChange={(e) => setForm({ ...form, endDate: e.target.value })}
-                  className="w-full border rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  className={inputCls}
                 />
               </div>
             </div>
-            <p className="text-xs text-gray-400">
+            <p className="text-xs text-slate-400">
               Your request will be reviewed by a manager. You'll receive an email when a decision is made.
             </p>
           </div>
