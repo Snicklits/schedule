@@ -21,6 +21,7 @@ import {
   createTimeOffRequest,
   getEmployeeById,
 } from "../repositories/index.js";
+import { prisma } from "../lib/prisma.js";
 
 export const portalRouter = Router();
 
@@ -93,6 +94,47 @@ portalRouter.post("/time-off", async (req, res) => {
   });
 
   res.status(201).json({ success: true, data: request });
+});
+
+// ─── POST /api/portal/avatar ──────────────────────────────────────────────────
+
+const avatarSchema = z.object({
+  base64: z.string().min(1),
+  mime_type: z.string().default("image/jpeg"),
+});
+
+portalRouter.post("/avatar", async (req, res) => {
+  const employeeId = getEmployeeId(req);
+  const body = parseBody(avatarSchema, req);
+
+  let avatar_url: string;
+  const supabaseUrl = process.env["SUPABASE_URL"];
+  const supabaseKey = process.env["SUPABASE_SERVICE_KEY"];
+
+  if (supabaseUrl && supabaseKey) {
+    const { createClient } = await import("@supabase/supabase-js");
+    const supabase = createClient(supabaseUrl, supabaseKey);
+    const buffer = Buffer.from(body.base64, "base64");
+    const ext = body.mime_type.split("/")[1] ?? "jpg";
+    const filename = `avatars/${employeeId}.${ext}`;
+    const { error } = await supabase.storage
+      .from("employee-photos")
+      .upload(filename, buffer, { contentType: body.mime_type, upsert: true });
+    if (error) throw new ApiError(500, "UPLOAD_FAILED", error.message);
+    const { data: urlData } = supabase.storage
+      .from("employee-photos")
+      .getPublicUrl(filename);
+    avatar_url = urlData.publicUrl;
+  } else {
+    avatar_url = `data:${body.mime_type};base64,${body.base64}`;
+  }
+
+  await (prisma as any).employee.update({
+    where: { id: employeeId },
+    data: { avatar_url },
+  });
+
+  res.json({ success: true, data: { avatar_url } });
 });
 
 // ─── GET /api/portal/hours ────────────────────────────────────────────────────

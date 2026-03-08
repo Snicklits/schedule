@@ -20,6 +20,19 @@ enum EmploymentType {
   PART_TIME
 }
 
+enum UserRole {
+  ADMIN
+  MANAGER
+  ASSISTANT_MANAGER
+  STAFF
+}
+
+enum UserAccountStatus {
+  INVITED
+  ACTIVE
+  SUSPENDED
+}
+
 /// MANAGER: required on peak shifts, highest authority
 /// ASSISTANT_MANAGER: required on any shift not covered by a Manager
 /// STAFF: cannot fulfill any management coverage requirement
@@ -89,12 +102,17 @@ model Employee {
   management_tier     ManagementTier
   specialties         String[]
   status              EmployeeStatus
+  hourly_rate         Float?
+  currency            String         @default("GBP")
+  avatar_url          String?
 
   time_off_requests       TimeOffRequest[]
   assignments             Assignment[]
   constraint_violations   ConstraintViolation[] @relation("ViolationEmployee")
   swap_requests_sent      ShiftSwapRequest[]    @relation("SwapRequester")
   swap_requests_received  ShiftSwapRequest[]    @relation("SwapTarget")
+  user_account            UserAccount?
+  pay_summaries           PaySummary[]
 }
 
 model Shift {
@@ -208,4 +226,78 @@ model ShiftSwapRequest {
   requester       Employee   @relation("SwapRequester", fields: [requester_id], references: [id])
   target_employee Employee   @relation("SwapTarget", fields: [target_employee_id], references: [id])
   assignment      Assignment @relation(fields: [assignment_id], references: [id])
+}
+
+// ─── Phase 9 Models ───────────────────────────────────────────────────────────
+
+model WeeklyBudget {
+  id               String   @id @default(cuid())
+  week_start       DateTime @unique
+  budget_hours     Float
+  created_at       DateTime @default(now())
+  updated_at       DateTime @updatedAt
+}
+
+model HistoricalEvent {
+  id           String   @id @default(cuid())
+  name         String
+  event_type   String
+  date         DateTime
+  staff_used   Int
+  hours_used   Float
+  notes        String?
+  created_at   DateTime @default(now())
+}
+
+model UpcomingEvent {
+  id                  String    @id @default(cuid())
+  name                String
+  event_type          String
+  date                DateTime
+  confirmed_staff     Int?
+  notes               String?
+  recommended_staff   Int?
+  recommended_hours   Float?
+  created_at          DateTime  @default(now())
+  updated_at          DateTime  @updatedAt
+}
+
+model PaySummary {
+  id              String   @id @default(cuid())
+  employee_id     String
+  week_start      DateTime
+  scheduled_hours Float
+  absent_hours    Float
+  worked_hours    Float
+  hourly_rate     Float
+  gross_pay       Float
+  currency        String   @default("GBP")
+  created_at      DateTime @default(now())
+
+  employee Employee @relation(fields: [employee_id], references: [id])
+
+  @@unique([employee_id, week_start])
+}
+
+model UserAccount {
+  id               String            @id @default(cuid())
+  employee_id      String            @unique
+  email            String            @unique
+  password_hash    String?
+  role             UserRole
+  status           UserAccountStatus @default(INVITED)
+  invite_token     String?           @unique
+  invite_expires_at DateTime?
+  last_login       DateTime?
+  created_at       DateTime          @default(now())
+
+  employee Employee @relation(fields: [employee_id], references: [id])
+}
+
+model CompanyConfig {
+  id           String   @id @default(cuid())
+  company_name String   @default("ScheduleMgr")
+  logo_url     String?
+  primary_color String? @default("#4f46e5")
+  updated_at   DateTime @updatedAt
 }

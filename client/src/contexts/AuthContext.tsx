@@ -1,11 +1,13 @@
 import React, { createContext, useContext, useState } from "react";
-import { mintAndStoreToken, clearToken, getStoredPayload } from "../auth.js";
+import { clearToken, getStoredPayload, storeToken } from "../auth.js";
+import { loginWithCredentials } from "../api/endpoints.js";
 
 interface AuthContextValue {
   isAuthenticated: boolean;
   role: string;        // "ADMIN" | "MANAGER" | "ASSISTANT_MANAGER" | "STAFF"
   employeeId: string;  // JWT sub — used to scope portal requests
-  login: (sub: string, role: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<void>;
+  loginDev: (sub: string, role: string) => Promise<void>;
   logout: () => void;
 }
 
@@ -23,9 +25,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [role, setRole] = useState(init.role);
   const [employeeId, setEmployeeId] = useState(init.employeeId);
 
-  async function login(sub: string, r: string) {
+  /** Real email+password login via /api/auth/login */
+  async function login(email: string, password: string) {
     clearToken();
-    await mintAndStoreToken(sub, r);
+    const result = await loginWithCredentials(email, password);
+    storeToken(result.token);
+    setIsAuthenticated(true);
+    setRole(result.role);
+    setEmployeeId(result.employeeId);
+  }
+
+  /** Dev-only: bypass real auth (stub endpoint) */
+  async function loginDev(sub: string, r: string) {
+    clearToken();
+    const res = await fetch("/api/auth/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sub, role: r }),
+    });
+    if (!res.ok) throw new Error("Dev login failed");
+    const { token } = (await res.json()) as { token: string };
+    storeToken(token);
     setIsAuthenticated(true);
     setRole(r);
     setEmployeeId(sub);
@@ -39,7 +59,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ isAuthenticated, role, employeeId, login, logout }}>
+    <AuthContext.Provider value={{ isAuthenticated, role, employeeId, login, loginDev, logout }}>
       {children}
     </AuthContext.Provider>
   );

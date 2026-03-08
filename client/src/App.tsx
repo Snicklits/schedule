@@ -14,10 +14,15 @@ import { EmployeeList } from "./views/EmployeeList.js";
 import { TimeOffDashboard } from "./views/TimeOffDashboard.js";
 import { HoursReport } from "./views/HoursReport.js";
 import { LoginView } from "./views/LoginView.js";
+import { SignupView } from "./views/SignupView.js";
+import { EventsView } from "./views/EventsView.js";
+import { PayrollView } from "./views/PayrollView.js";
+import { CompanySettingsView } from "./views/CompanySettingsView.js";
 import { PortalSchedule } from "./views/portal/PortalSchedule.js";
 import { PortalTimeOff } from "./views/portal/PortalTimeOff.js";
 import { PortalHours } from "./views/portal/PortalHours.js";
 import { PortalSwaps } from "./views/portal/PortalSwaps.js";
+import { PortalPay } from "./views/portal/PortalPay.js";
 
 const MANAGER_ROLES = new Set(["ADMIN", "MANAGER", "ASSISTANT_MANAGER"]);
 
@@ -38,7 +43,10 @@ function ManagerLayout() {
             <Route path="/time-off" element={<TimeOffDashboard />} />
             <Route path="/hours" element={<HoursReport />} />
             <Route path="/alerts" element={<HoursReport />} />
+            <Route path="/events" element={<EventsView />} />
+            <Route path="/payroll" element={<PayrollView />} />
             <Route path="/settings" element={<HoursReport />} />
+            <Route path="/company" element={<CompanySettingsView />} />
             {/* Redirect portal paths to manager home */}
             <Route path="/portal/*" element={<Navigate to="/" replace />} />
           </Routes>
@@ -60,6 +68,7 @@ function PortalLayout() {
             <Route path="/portal/time-off" element={<PortalTimeOff />} />
             <Route path="/portal/hours" element={<PortalHours />} />
             <Route path="/portal/swaps" element={<PortalSwaps />} />
+            <Route path="/portal/pay" element={<PortalPay />} />
             <Route path="*" element={<Navigate to="/portal/schedule" replace />} />
           </Routes>
         </main>
@@ -70,6 +79,11 @@ function PortalLayout() {
 
 function AppShell() {
   const { isAuthenticated, role } = useAuth();
+
+  // Signup page is always accessible
+  if (window.location.pathname === "/signup") {
+    return <SignupView />;
+  }
 
   if (!isAuthenticated) {
     return <LoginView />;

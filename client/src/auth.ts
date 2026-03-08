@@ -25,7 +25,12 @@ export async function mintAndStoreToken(sub: string, role: string): Promise<stri
   return token;
 }
 
-/** Returns the cached token (for API interceptor). Fetches from server if none exists. */
+/** Stores a pre-fetched JWT directly (e.g. from /api/auth/login response). */
+export function storeToken(token: string): void {
+  localStorage.setItem(STORAGE_KEY, token);
+}
+
+/** Returns the cached token (for API interceptor). */
 export async function getToken(): Promise<string> {
   const stored = localStorage.getItem(STORAGE_KEY);
   if (stored) return stored;

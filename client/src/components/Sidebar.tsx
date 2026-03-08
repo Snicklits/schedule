@@ -1,17 +1,17 @@
 /**
  * Sidebar — fixed 220px left sidebar for the manager interface.
  *
- * Sections:
- *   • Avatar block with stats
- *   • Main nav
- *   • Reports nav
- *   • Configuration nav
- *   • Bottom: Dark-mode toggle + Settings
+ * Phase 9 additions:
+ *   - Loads company branding (name + logo) on mount
+ *   - New nav links: Events, Payroll, Company Settings
  */
 
 import { NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext.js";
 import { useAlerts } from "../contexts/AlertsContext.js";
+import { useState, useEffect } from "react";
+import { fetchCompanyConfig } from "../api/endpoints.js";
+import type { CompanyConfig } from "../api/types.js";
 
 // ─── Icons (inline SVG wrappers) ─────────────────────────────────────────────
 
@@ -30,11 +30,13 @@ const ICONS = {
   clock:     "M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM12 6v6l4 2",
   calendar:  "M3 4h18v18H3zM16 2v4M8 2v4M3 10h18",
   chart:     "M18 20V10M12 20V4M6 20v-6",
-  shield:    "M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z",
   cog:       "M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z",
   logout:    "M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9",
   sun:       "M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42M12 5a7 7 0 1 0 0 14A7 7 0 0 0 12 5z",
   alert:     "M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0zM12 9v4M12 17h.01",
+  star:      "M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z",
+  cash:      "M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6",
+  building:  "M3 21h18M5 21V7l7-4 7 4v14M9 21V12h6v9",
 };
 
 interface NavItemProps {
@@ -89,20 +91,32 @@ export function Sidebar() {
   const { logout } = useAuth();
   const { violations, gaps } = useAlerts();
   const navigate = useNavigate();
+  const [company, setCompany] = useState<CompanyConfig | null>(null);
+
+  useEffect(() => {
+    fetchCompanyConfig().then(setCompany).catch(() => {});
+  }, []);
 
   const alertCount = violations.filter((v) => v.type === "BLOCKING").length + gaps.length;
   const totalStaff = 13; // approximate — sidebar stat
+
+  const companyName = company?.company_name ?? "ScheduleMgr";
+  const logoUrl = company?.logo_url;
 
   return (
     <aside className="w-[220px] flex-shrink-0 bg-white border-r border-slate-200 flex flex-col h-full overflow-y-auto">
       {/* ── Brand ── */}
       <div className="px-4 pt-5 pb-3 border-b border-slate-100">
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-indigo-600 flex items-center justify-center flex-shrink-0">
-            <Icon path={ICONS.grid} className="w-4 h-4 text-white" />
-          </div>
-          <div className="leading-tight">
-            <p className="text-sm font-bold text-slate-900">ScheduleMgr</p>
+          {logoUrl ? (
+            <img src={logoUrl} alt={companyName} className="w-8 h-8 rounded-lg object-contain flex-shrink-0" />
+          ) : (
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-indigo-600 flex items-center justify-center flex-shrink-0">
+              <Icon path={ICONS.grid} className="w-4 h-4 text-white" />
+            </div>
+          )}
+          <div className="leading-tight min-w-0">
+            <p className="text-sm font-bold text-slate-900 truncate">{companyName}</p>
             <p className="text-[10px] text-slate-400">Manager Portal</p>
           </div>
         </div>
@@ -148,23 +162,21 @@ export function Sidebar() {
         <div className="space-y-0.5">
           <NavItem to="/time-off" iconPath={ICONS.clock} label="Time Off" />
           <NavItem to="/hours" iconPath={ICONS.chart} label="Hours" />
-          <NavItem
-            to="/alerts"
-            iconPath={ICONS.alert}
-            label="Alerts"
-            badge={alertCount}
-          />
+          <NavItem to="/alerts" iconPath={ICONS.alert} label="Alerts" badge={alertCount} />
+          <NavItem to="/events" iconPath={ICONS.star} label="Events" />
+          <NavItem to="/payroll" iconPath={ICONS.cash} label="Payroll" />
         </div>
 
         <SectionLabel label="Configuration" />
         <div className="space-y-0.5">
           <NavItem to="/settings" iconPath={ICONS.cog} label="Settings" />
+          <NavItem to="/company" iconPath={ICONS.building} label="Company" />
         </div>
       </nav>
 
       {/* ── Bottom ── */}
       <div className="px-3 py-3 border-t border-slate-100 space-y-1">
-        {/* Light/dark toggle (visual only — no dark mode wiring) */}
+        {/* Light/dark toggle (visual only) */}
         <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-slate-50 text-xs text-slate-500">
           <span className="flex items-center gap-2">
             <Icon path={ICONS.sun} className="w-3.5 h-3.5" />
@@ -176,7 +188,7 @@ export function Sidebar() {
         </div>
 
         <button
-          onClick={() => { logout(); navigate("/login"); }}
+          onClick={() => { logout(); navigate("/"); }}
           className="flex items-center gap-2.5 w-full px-3 py-2 rounded-xl text-sm text-slate-500 hover:bg-red-50 hover:text-red-600 transition-all duration-150"
         >
           <Icon path={ICONS.logout} className="w-4 h-4" />

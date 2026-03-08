@@ -166,3 +166,83 @@ export interface PortalHoursSummary {
   targetHours: number;
   assignments: AssignmentWithDetails[];
 }
+
+// ─── Budget ───────────────────────────────────────────────────────────────────
+
+export interface BudgetSummary {
+  week_start: string;
+  budget_hours: number | null;
+  scheduled_hours: number;
+  variance: number | null;
+  status: "UNDER" | "ON_TRACK" | "OVER" | null;
+}
+
+// ─── Events ───────────────────────────────────────────────────────────────────
+
+export interface HistoricalEvent {
+  id: string;
+  name: string;
+  event_type: string;
+  date: string;
+  staff_used: number;
+  hours_used: number;
+  notes: string | null;
+  created_at: string;
+}
+
+export interface UpcomingEvent {
+  id: string;
+  name: string;
+  event_type: string;
+  date: string;
+  confirmed_staff: number | null;
+  notes: string | null;
+  recommended_staff: number | null;
+  recommended_hours: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
+// ─── Salary ───────────────────────────────────────────────────────────────────
+
+export interface PaySummary {
+  employee_id: string;
+  employee_name: string;
+  week_start: string;
+  scheduled_hours: number;
+  absent_hours: number;
+  worked_hours: number;
+  hourly_rate: number;
+  gross_pay: number;
+  currency: string;
+  weekly_hours_target: number;
+}
+
+export interface TeamSalaryResult {
+  employees: PaySummary[];
+  team_total_gross: number;
+}
+
+// ─── Company Config ───────────────────────────────────────────────────────────
+
+export interface CompanyConfig {
+  id: string;
+  company_name: string;
+  logo_url: string | null;
+  primary_color: string | null;
+  updated_at: string;
+}
+
+// ─── Employee (extended) ──────────────────────────────────────────────────────
+
+export type UserAccountStatus = "INVITED" | "ACTIVE" | "SUSPENDED";
+
+export interface EmployeeWithAccount extends EmployeeWithStatus {
+  hourly_rate?: number;
+  currency?: string;
+  avatar_url?: string | null;
+  user_account?: {
+    status: UserAccountStatus;
+    email: string;
+  } | null;
+}

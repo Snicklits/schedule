@@ -1,8 +1,9 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { generateSchedule, fetchCoverageCheck } from "../api/endpoints.js";
-import type { ScheduleGenerateResult, CoverageCheckResult } from "../api/types.js";
+import { generateSchedule, fetchCoverageCheck, fetchBudget, saveBudget } from "../api/endpoints.js";
+import type { ScheduleGenerateResult, CoverageCheckResult, BudgetSummary } from "../api/types.js";
 import { ErrorBanner } from "../components/ErrorBanner.js";
+import { BudgetBar } from "../components/BudgetBar.js";
 import { useAlerts } from "../contexts/AlertsContext.js";
 
 function toMonday(dateStr: string): string {
@@ -20,7 +21,14 @@ export function ScheduleGenerator() {
   const [result, setResult] = useState<ScheduleGenerateResult | null>(null);
   const [coverageCheck, setCoverageCheck] = useState<CoverageCheckResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [budget, setBudget] = useState<BudgetSummary | null>(null);
+  const [budgetInput, setBudgetInput] = useState("");
+  const [savingBudget, setSavingBudget] = useState(false);
   const { refresh } = useAlerts();
+
+  useEffect(() => {
+    fetchBudget(weekStart).then(setBudget).catch(() => setBudget(null));
+  }, [weekStart]);
 
   const runCoverageCheck = useCallback(
     async (week: string) => {
@@ -67,6 +75,22 @@ export function ScheduleGenerator() {
     setError(null);
   }
 
+  async function handleSaveBudget() {
+    const h = parseFloat(budgetInput);
+    if (isNaN(h) || h <= 0) return;
+    setSavingBudget(true);
+    try {
+      await saveBudget(weekStart, h);
+      const updated = await fetchBudget(weekStart);
+      setBudget(updated);
+      setBudgetInput("");
+    } catch {
+      // ignore
+    } finally {
+      setSavingBudget(false);
+    }
+  }
+
   function handlePublish() {
     navigate(`/?week=${weekStart}`);
   }
@@ -102,6 +126,38 @@ export function ScheduleGenerator() {
             className="w-full h-10 px-4 rounded-xl border border-slate-200 text-sm text-slate-800 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:bg-white transition-all"
           />
           <p className="text-xs text-slate-400 mt-1">Auto-snapped to Monday</p>
+        </div>
+
+        {/* Labour Budget */}
+        <div className="border-t border-slate-100 pt-4 space-y-3">
+          <label className="block text-xs font-semibold text-slate-600">Weekly Labour Budget (hours)</label>
+          <div className="flex gap-2">
+            <input
+              type="number"
+              min="0"
+              step="0.5"
+              value={budgetInput}
+              onChange={(e) => setBudgetInput(e.target.value)}
+              placeholder={budget?.budget_hours?.toString() ?? "e.g. 160"}
+              className="flex-1 h-9 px-3 rounded-xl border border-slate-200 text-sm text-slate-800 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:bg-white transition-all"
+            />
+            <button
+              onClick={handleSaveBudget}
+              disabled={savingBudget || !budgetInput}
+              className="h-9 px-4 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-semibold disabled:opacity-50 transition-all"
+            >
+              {savingBudget ? "Saving…" : "Set"}
+            </button>
+          </div>
+          {budget && <BudgetBar budget={budget} />}
+          {budget?.status === "OVER" && (
+            <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-xl px-3 py-2">
+              <span className="text-red-500 text-base">🚩</span>
+              <p className="text-xs text-red-700 font-medium">
+                Scheduled hours exceed the weekly budget by {budget.variance?.toFixed(1)}h
+              </p>
+            </div>
+          )}
         </div>
 
         <button

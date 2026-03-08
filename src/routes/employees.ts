@@ -24,6 +24,8 @@ import {
   updateEmployeeSchema,
   employeeQuerySchema,
 } from "../api/schemas.js";
+import { prisma } from "../lib/prisma.js";
+import { notifyInvite } from "../services/notifications.js";
 
 export const employeeRouter = Router();
 
@@ -64,6 +66,39 @@ employeeRouter.post("/", async (req, res) => {
     management_tier: body.management_tier,
     specialties: body.specialties,
   });
+
+  // Create UserAccount with INVITED status and send invite email
+  const inviteToken =
+    Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
+  const inviteExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+  // Derive role from management_tier
+  const roleMap: Record<string, string> = {
+    MANAGER: "MANAGER",
+    ASSISTANT_MANAGER: "ASSISTANT_MANAGER",
+    STAFF: "STAFF",
+  };
+  const accountRole = roleMap[body.management_tier] ?? "STAFF";
+
+  // Create UserAccount (fire-and-forget — don't block employee creation if DB unavailable)
+  Promise.resolve()
+    .then(async () => {
+      await (prisma as any).userAccount.create({
+        data: {
+          employee_id: employee.id,
+          email: body.email,
+          role: accountRole,
+          status: "INVITED",
+          invite_token: inviteToken,
+          invite_expires_at: inviteExpiresAt,
+        },
+      });
+      await notifyInvite({ name: body.name, email: body.email }, inviteToken);
+    })
+    .catch((err: unknown) => {
+      console.warn("[employees] Failed to create UserAccount/send invite:", err);
+    });
+
   res.status(201).json({ success: true, data: employee });
 });
 

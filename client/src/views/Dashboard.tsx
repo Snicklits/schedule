@@ -13,11 +13,12 @@ import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   fetchSchedule, fetchHoursSummary, fetchAllTimeOff,
-  fetchAllEmployees, approveTimeOff,
+  fetchAllEmployees, approveTimeOff, fetchBudget, fetchNext30DaysEvents,
 } from "../api/endpoints.js";
-import type { AssignmentWithDetails, HoursSummaryRow, TimeOffWithEmployee, EmployeeWithStatus } from "../api/types.js";
+import type { AssignmentWithDetails, HoursSummaryRow, TimeOffWithEmployee, EmployeeWithStatus, BudgetSummary, UpcomingEvent } from "../api/types.js";
 import { useToast } from "../contexts/ToastContext.js";
 import { StatusBadge } from "../components/StatusBadge.js";
+import { BudgetBar } from "../components/BudgetBar.js";
 import {
   SEED_ASSIGNMENTS, SEED_HOURS, SEED_EMPLOYEES, SEED_TIME_OFF,
   initials, tierGradient,
@@ -558,6 +559,56 @@ function QuickActionsCard({ pendingTimeOff, onRefresh }: { pendingTimeOff: TimeO
   );
 }
 
+// ─── Events mini-card ─────────────────────────────────────────────────────────
+
+function EventsMiniCard({ events }: { events: UpcomingEvent[] }) {
+  const navigate = useNavigate();
+  const next3 = events.slice(0, 3);
+  if (next3.length === 0) return null;
+
+  return (
+    <Card>
+      <CardHeader
+        title="Upcoming Events"
+        action={
+          <button
+            onClick={() => navigate("/events")}
+            className="text-xs font-medium text-indigo-600 hover:text-indigo-800 transition-colors"
+          >
+            All events →
+          </button>
+        }
+      />
+      <div className="px-5 pb-4 space-y-2">
+        {next3.map((ev) => {
+          const staffDiff =
+            ev.recommended_staff !== null &&
+            ev.confirmed_staff !== null &&
+            Math.abs(ev.confirmed_staff - ev.recommended_staff) > 2;
+          return (
+            <div key={ev.id} className="flex items-center gap-3 p-2.5 rounded-xl bg-slate-50 border border-slate-100">
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-semibold text-slate-800 truncate">{ev.name}</p>
+                <p className="text-[10px] text-slate-400">
+                  {new Date(ev.date).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" })}
+                  {" · "}
+                  {ev.confirmed_staff ?? "?"} confirmed
+                  {ev.recommended_staff !== null && ` · rec. ${ev.recommended_staff}`}
+                </p>
+              </div>
+              {staffDiff && (
+                <span className="text-[10px] font-bold bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full flex-shrink-0">
+                  ⚠ diff
+                </span>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </Card>
+  );
+}
+
 // ─── Dashboard ────────────────────────────────────────────────────────────────
 
 export function Dashboard() {
@@ -565,6 +616,8 @@ export function Dashboard() {
   const [hours, setHours] = useState<HoursSummaryRow[]>([]);
   const [employees, setEmployees] = useState<EmployeeWithStatus[]>([]);
   const [pendingTO, setPendingTO] = useState<TimeOffWithEmployee[]>([]);
+  const [budget, setBudget] = useState<BudgetSummary | null>(null);
+  const [upcomingEvents, setUpcomingEvents] = useState<UpcomingEvent[]>([]);
   const [refresh, setRefresh] = useState(0);
 
   const weekStart = currentMonday();
@@ -576,18 +629,45 @@ export function Dashboard() {
     fetchAllTimeOff()
       .then((all) => setPendingTO(all.filter((r) => r.status === "PENDING")))
       .catch(() => {});
+    fetchBudget(weekStart).then(setBudget).catch(() => {});
+    fetchNext30DaysEvents().then(setUpcomingEvents).catch(() => {});
   }, [weekStart, refresh]);
 
   useEffect(() => { load(); }, [load]);
 
+  const isOverBudget = budget?.status === "OVER";
+
   return (
     <div className="space-y-5">
+      {/* Over-budget banner */}
+      {isOverBudget && (
+        <div className="flex items-center gap-3 bg-red-50 border border-red-200 rounded-2xl px-5 py-3">
+          <span className="text-red-500 text-xl">🚩</span>
+          <div>
+            <p className="text-sm font-bold text-red-700">Over Budget</p>
+            <p className="text-xs text-red-600">
+              Scheduled hours ({budget!.scheduled_hours.toFixed(1)}h) exceed the weekly budget ({budget!.budget_hours}h) by {budget!.variance?.toFixed(1)}h
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Budget bar */}
+      {budget && (
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 px-5 py-4">
+          <BudgetBar budget={budget} />
+        </div>
+      )}
+
       {/* Top row — 3 columns */}
       <div className="grid grid-cols-3 gap-5">
         <ScheduleMenuCard />
         <WeeklySummaryCard hours={hours} />
         <QuickActionsCard pendingTimeOff={pendingTO} onRefresh={() => setRefresh((n) => n + 1)} />
       </div>
+
+      {/* Events mini-card */}
+      {upcomingEvents.length > 0 && <EventsMiniCard events={upcomingEvents} />}
 
       {/* Staff Spotlight — full width */}
       <StaffSpotlightCard employees={employees} />

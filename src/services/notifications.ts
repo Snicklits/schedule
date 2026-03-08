@@ -86,6 +86,22 @@ export async function notifySwapRequested(
   );
 }
 
+/** Notify a new employee with their invite link. */
+export async function notifyInvite(
+  employee: { name: string; email: string },
+  inviteToken: string
+): Promise<void> {
+  const appUrl = process.env["APP_URL"] ?? "http://localhost:5173";
+  const link = `${appUrl}/signup?token=${inviteToken}`;
+  await send(
+    employee.email,
+    "You've been invited to ScheduleMgr",
+    `Hi ${employee.name},\n\nYou've been invited to join ScheduleMgr.\n\n` +
+      `Please click the link below to set up your account:\n${link}\n\n` +
+      `This link expires in 7 days.\n\nThank you.`
+  );
+}
+
 /** Notify the requester when a manager approves or denies their swap. */
 export async function notifySwapDecision(
   requester: { name: string; email: string },
