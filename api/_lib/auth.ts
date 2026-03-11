@@ -20,3 +20,13 @@ export function requireAuth(req: VercelRequest): AuthPayload {
     throw new ApiError(401, "UNAUTHORIZED", "Invalid or expired token");
   }
 }
+
+export function optionalAuth(req: VercelRequest): AuthPayload | null {
+  const header = req.headers["authorization"];
+  if (typeof header !== "string" || !header.startsWith("Bearer ")) return null;
+  try {
+    return jwt.verify(header.slice(7), JWT_SECRET) as AuthPayload;
+  } catch {
+    return null;
+  }
+}

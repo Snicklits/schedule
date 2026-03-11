@@ -1,7 +1,7 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { generateSchedule, fetchCoverageCheck } from "../api/endpoints.js";
-import type { ScheduleGenerateResult, CoverageCheckResult } from "../api/types.js";
+import { generateSchedule, fetchCoverageCheck, fetchBudget, saveBudget } from "../api/endpoints.js";
+import type { ScheduleGenerateResult, CoverageCheckResult, BudgetStatus } from "../api/types.js";
 import { ErrorBanner } from "../components/ErrorBanner.js";
 import { useAlerts } from "../contexts/AlertsContext.js";
 
@@ -22,23 +22,51 @@ export function ScheduleGenerator() {
   const [error, setError] = useState<string | null>(null);
   const { refresh } = useAlerts();
 
-  const runCoverageCheck = useCallback(
-    async (week: string) => {
-      setCheckingCoverage(true);
-      try {
-        const check = await fetchCoverageCheck(week);
-        setCoverageCheck(check);
-        return check;
-      } catch {
-        // Coverage check failure is non-blocking for viewing results
-        setCoverageCheck(null);
-        return null;
-      } finally {
-        setCheckingCoverage(false);
-      }
-    },
-    []
-  );
+  // Budget state
+  const [budget, setBudget] = useState<BudgetStatus | null>(null);
+  const [budgetInput, setBudgetInput] = useState("");
+  const [savingBudget, setSavingBudget] = useState(false);
+  const [budgetSaved, setBudgetSaved] = useState(false);
+
+  useEffect(() => {
+    fetchBudget(weekStart)
+      .then((b) => {
+        setBudget(b);
+        if (b.budget_hours != null) setBudgetInput(String(b.budget_hours));
+      })
+      .catch(() => setBudget(null));
+  }, [weekStart]);
+
+  async function handleSaveBudget() {
+    const hours = parseFloat(budgetInput);
+    if (isNaN(hours) || hours <= 0) return;
+    setSavingBudget(true);
+    try {
+      await saveBudget(weekStart, hours);
+      const updated = await fetchBudget(weekStart);
+      setBudget(updated);
+      setBudgetSaved(true);
+      setTimeout(() => setBudgetSaved(false), 2000);
+    } catch {
+      // ignore budget errors
+    } finally {
+      setSavingBudget(false);
+    }
+  }
+
+  const runCoverageCheck = useCallback(async (week: string) => {
+    setCheckingCoverage(true);
+    try {
+      const check = await fetchCoverageCheck(week);
+      setCoverageCheck(check);
+      return check;
+    } catch {
+      setCoverageCheck(null);
+      return null;
+    } finally {
+      setCheckingCoverage(false);
+    }
+  }, []);
 
   async function handleGenerate() {
     setLoading(true);
@@ -53,10 +81,21 @@ export function ScheduleGenerator() {
         await runCoverageCheck(weekStart);
       }
     } catch (err: unknown) {
-      const msg =
-        (err as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error
-          ?.message ?? "Failed to generate schedule";
-      setError(msg);
+      const errData = (err as { response?: { data?: { error?: { message?: string }; details?: { errors?: unknown[]; warnings?: string[]; isPublishable?: boolean; runId?: string } } } })?.response?.data;
+      const msg = errData?.error?.message ?? "Failed to generate schedule";
+      // If backend returned structured error with details, show as result
+      if (errData?.details) {
+        const det = errData.details;
+        setResult({
+          runId: det.runId ?? "",
+          schedule: [],
+          errors: (det.errors ?? []) as ScheduleGenerateResult["errors"],
+          warnings: det.warnings ?? [],
+          isPublishable: false,
+        });
+      } else {
+        setError(msg);
+      }
     } finally {
       setLoading(false);
     }
@@ -69,9 +108,20 @@ export function ScheduleGenerator() {
   }
 
   function handlePublish() {
-    // Navigate to the schedule grid for the generated week
     navigate(`/?week=${weekStart}`);
   }
+
+  // Budget bar
+  const budgetHours = budget?.budget_hours;
+  const scheduledHours = budget?.scheduled_hours ?? 0;
+  const budgetPct = budgetHours ? Math.min(100, (scheduledHours / budgetHours) * 100) : 0;
+  const budgetColor = !budgetHours
+    ? "bg-gray-300"
+    : scheduledHours > budgetHours
+      ? "bg-red-500"
+      : scheduledHours >= budgetHours - 10
+        ? "bg-amber-400"
+        : "bg-green-500";
 
   const publishBlocked =
     !result?.isPublishable ||
@@ -83,12 +133,15 @@ export function ScheduleGenerator() {
     : checkingCoverage
       ? "Checking coverage…"
       : coverageCheck && !coverageCheck.isFullyCovered
-        ? `Cannot publish: ${coverageCheck.managementGaps.length} management gap(s) and ${coverageCheck.peakWithoutManager.length} peak shift(s) without a manager`
+        ? `Cannot publish: coverage gaps detected`
         : "Publish this schedule";
 
   return (
     <div className="max-w-2xl mx-auto py-10 px-4 space-y-6">
-      <h1 className="text-2xl font-bold text-gray-800">Generate Schedule</h1>
+      <div>
+        <h1 className="text-2xl font-bold text-gray-800">Generate Schedule</h1>
+        <p className="text-sm text-gray-500">Auto-assign employees to shifts for the selected week</p>
+      </div>
 
       <div className="bg-white rounded-lg border shadow-sm p-6 space-y-4">
         <div>
@@ -97,15 +150,52 @@ export function ScheduleGenerator() {
             type="date"
             value={weekStart}
             onChange={(e) => setWeekStart(toMonday(e.target.value))}
-            className="border rounded px-3 py-2 text-sm w-full focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="border rounded px-3 py-2 text-sm w-full focus:outline-none focus:ring-2 focus:ring-indigo-500"
           />
           <p className="text-xs text-gray-400 mt-1">Auto-snapped to Monday</p>
         </div>
 
+        {/* Budget input */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Weekly Labour Budget (hours)</label>
+          <div className="flex gap-2">
+            <input
+              type="number"
+              min="1"
+              value={budgetInput}
+              onChange={(e) => setBudgetInput(e.target.value)}
+              className="border rounded px-3 py-2 text-sm flex-1 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              placeholder="e.g. 416"
+            />
+            <button
+              onClick={handleSaveBudget}
+              disabled={savingBudget || !budgetInput}
+              className="bg-gray-100 hover:bg-gray-200 border text-gray-700 font-medium px-4 py-2 rounded text-sm disabled:opacity-50"
+            >
+              {savingBudget ? "…" : budgetSaved ? "✓" : "Set"}
+            </button>
+          </div>
+        </div>
+
+        {/* Budget bar */}
+        {budgetHours != null && (
+          <div className="space-y-1">
+            <div className="flex justify-between text-xs text-gray-500">
+              <span>{scheduledHours.toFixed(1)} / {budgetHours} hrs budgeted this week</span>
+              <span className={budget?.status === "OVER" ? "text-red-600 font-semibold" : budget?.status === "ON_TRACK" ? "text-green-600" : "text-gray-500"}>
+                {budget?.status}
+              </span>
+            </div>
+            <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+              <div className={`h-full rounded-full transition-all ${budgetColor}`} style={{ width: `${budgetPct}%` }} />
+            </div>
+          </div>
+        )}
+
         <button
           onClick={handleGenerate}
           disabled={loading}
-          className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-medium py-2 rounded text-sm transition-colors"
+          className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-medium py-2 rounded text-sm transition-colors"
         >
           {loading ? "Generating…" : "Generate Schedule"}
         </button>
@@ -114,106 +204,77 @@ export function ScheduleGenerator() {
       {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
 
       {result && (
-        <div
-          className={`rounded-lg border p-6 space-y-4 ${
-            result.isPublishable ? "bg-green-50 border-green-300" : "bg-red-50 border-red-300"
-          }`}
-        >
-          {/* Status header */}
+        <div className={`rounded-lg border p-6 space-y-4 ${result.isPublishable ? "bg-green-50 border-green-300" : "bg-red-50 border-red-300"}`}>
           <div className="flex items-center gap-3">
             <span className={`text-2xl ${result.isPublishable ? "text-green-600" : "text-red-600"}`}>
               {result.isPublishable ? "✓" : "✗"}
             </span>
             <div>
-              <p className="font-semibold text-gray-800">
-                {result.isPublishable ? "Schedule Generated" : "Generation HALTED"}
-              </p>
-              <p className="text-xs text-gray-500">Run ID: {result.runId}</p>
+              <p className="font-semibold text-gray-800">{result.isPublishable ? "Schedule Generated" : "Generation HALTED"}</p>
+              {result.runId && <p className="text-xs text-gray-500">Run ID: {result.runId}</p>}
             </div>
           </div>
 
-          {/* Errors */}
           {result.errors.length > 0 && (
             <div className="space-y-1">
               <p className="text-sm font-medium text-red-700">Errors ({result.errors.length}):</p>
               <ul className="list-disc list-inside text-sm text-red-700 space-y-0.5">
-                {result.errors.map((e, i) => (
-                  <li key={i}>{e.reason}</li>
-                ))}
+                {result.errors.map((e, i) => <li key={i}>{e.reason}</li>)}
               </ul>
             </div>
           )}
 
-          {/* Warnings */}
           {result.warnings.length > 0 && (
             <div className="space-y-1">
               <p className="text-sm font-medium text-yellow-700">Warnings ({result.warnings.length}):</p>
               <ul className="list-disc list-inside text-sm text-yellow-700 space-y-0.5">
-                {result.warnings.map((w, i) => (
-                  <li key={i}>{w}</li>
-                ))}
+                {result.warnings.map((w, i) => <li key={i}>{w}</li>)}
               </ul>
             </div>
           )}
 
-          {/* Coverage check result */}
           {result.isPublishable && (
             <div className="border-t pt-3">
-              {checkingCoverage && (
-                <p className="text-xs text-gray-400">Checking coverage…</p>
-              )}
+              {checkingCoverage && <p className="text-xs text-gray-400">Checking coverage…</p>}
               {!checkingCoverage && coverageCheck && (
-                coverageCheck.isFullyCovered ? (
-                  <p className="text-sm text-green-700 font-medium">✓ Full management coverage confirmed</p>
-                ) : (
-                  <div className="space-y-1">
-                    <p className="text-sm font-medium text-red-700">Coverage gaps prevent publishing:</p>
-                    {coverageCheck.managementGaps.length > 0 && (
-                      <p className="text-xs text-red-600">
-                        {coverageCheck.managementGaps.length} shift(s) without any management presence
-                      </p>
-                    )}
-                    {coverageCheck.peakWithoutManager.length > 0 && (
-                      <p className="text-xs text-yellow-700">
-                        {coverageCheck.peakWithoutManager.length} peak shift(s) without a Manager (AM only)
-                      </p>
-                    )}
-                  </div>
-                )
+                coverageCheck.isFullyCovered
+                  ? <p className="text-sm text-green-700 font-medium">✓ Full management coverage confirmed</p>
+                  : (
+                    <div className="space-y-1">
+                      <p className="text-sm font-medium text-red-700">Coverage gaps prevent publishing:</p>
+                      {coverageCheck.managementGaps.length > 0 && (
+                        <p className="text-xs text-red-600">{coverageCheck.managementGaps.length} shift(s) without management</p>
+                      )}
+                      {coverageCheck.peakWithoutManager.length > 0 && (
+                        <p className="text-xs text-yellow-700">{coverageCheck.peakWithoutManager.length} peak shift(s) without a Manager</p>
+                      )}
+                    </div>
+                  )
               )}
             </div>
           )}
 
-          {/* Assignment preview */}
           {result.isPublishable && result.schedule.length > 0 && (
             <details className="border-t pt-3">
               <summary className="text-sm font-medium text-gray-700 cursor-pointer select-none">
                 Preview assignments ({result.schedule.length})
               </summary>
               <div className="mt-2 max-h-48 overflow-y-auto space-y-1">
-                {result.schedule.map((a) => (
-                  <div key={a.id} className="text-xs flex items-center gap-2 py-0.5">
-                    <span className="text-gray-500 w-20 shrink-0">{a.shift.date.slice(5)}</span>
+                {result.schedule.map((a, i) => (
+                  <div key={a.id ?? (a.shift_id + i)} className="text-xs flex items-center gap-2 py-0.5">
+                    <span className="text-gray-500 w-20 shrink-0">{(a.shift?.date ?? "").slice(5, 10)}</span>
                     <span className="text-gray-500 w-24 shrink-0">
-                      {a.shift.start_time.slice(11, 16)}–{a.shift.end_time.slice(11, 16)}
+                      {(a.shift?.start_time ?? '').slice(11, 16)}–{(a.shift?.end_time ?? '').slice(11, 16)}
                     </span>
-                    <span className="font-medium text-gray-800">{a.employee.name}</span>
-                    <span className="text-gray-400">({a.employee.management_tier.replace("_", " ")})</span>
-                    {a.shift.required_specialty && (
-                      <span className="text-gray-400">· {a.shift.required_specialty}</span>
-                    )}
+                    <span className="font-medium text-gray-800">{a.employee?.name ?? a.employee_id}</span>
                   </div>
                 ))}
               </div>
             </details>
           )}
 
-          {/* Actions */}
           <div className="flex gap-3 border-t pt-3">
-            <button
-              onClick={handleDiscard}
-              className="bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-2 px-4 rounded text-sm"
-            >
+            <button onClick={handleDiscard} className="bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-2 px-4 rounded text-sm">
               Discard
             </button>
             <div className="relative group">

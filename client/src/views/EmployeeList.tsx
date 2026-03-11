@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { fetchAllEmployees, createEmployee, updateEmployee } from "../api/endpoints.js";
+import { fetchAllEmployees, createEmployee, updateEmployee, resendInvite } from "../api/endpoints.js";
 import type { EmployeeWithStatus, ManagementTier } from "../api/types.js";
 import { ErrorBanner } from "../components/ErrorBanner.js";
 import { Modal } from "../components/Modal.js";
@@ -191,13 +191,14 @@ export function EmployeeList() {
                 <th className="px-4 py-3 text-left">Type</th>
                 <th className="px-4 py-3 text-right">Hours/wk</th>
                 <th className="px-4 py-3 text-center">Status</th>
+                <th className="px-4 py-3 text-center">Account</th>
                 <th className="px-4 py-3" />
               </tr>
             </thead>
             <tbody className="divide-y">
               {visible.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-4 py-6 text-center text-gray-400">
+                  <td colSpan={8} className="px-4 py-6 text-center text-gray-400">
                     No employees found
                   </td>
                 </tr>
@@ -220,7 +221,29 @@ export function EmployeeList() {
                       {emp.status}
                     </span>
                   </td>
-                  <td className="px-4 py-2 text-right">
+                  <td className="px-4 py-2 text-center">
+                    {(emp as EmployeeWithStatus & { account_status?: string }).account_status === "INVITED" && (
+                      <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">Invited</span>
+                    )}
+                    {(emp as EmployeeWithStatus & { account_status?: string }).account_status === "ACTIVE" && (
+                      <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">Active</span>
+                    )}
+                    {(emp as EmployeeWithStatus & { account_status?: string }).account_status === "SUSPENDED" && (
+                      <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full">Suspended</span>
+                    )}
+                    {!(emp as EmployeeWithStatus & { account_status?: string }).account_status && (
+                      <span className="text-xs text-gray-400">—</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-2 text-right flex items-center gap-2 justify-end">
+                    {(emp as EmployeeWithStatus & { account_status?: string }).account_status === "INVITED" && (
+                      <button
+                        onClick={async () => { try { await resendInvite(emp.id); showToast("Invite resent", "success"); } catch { /* ignore */ } }}
+                        className="text-xs text-amber-600 hover:text-amber-800"
+                      >
+                        Resend Invite
+                      </button>
+                    )}
                     <button
                       onClick={() => openEdit(emp)}
                       className="text-xs text-blue-600 hover:text-blue-800"

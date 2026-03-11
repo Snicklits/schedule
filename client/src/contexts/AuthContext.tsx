@@ -1,34 +1,41 @@
 import React, { createContext, useContext, useState } from "react";
-import { mintAndStoreToken, clearToken, getStoredPayload } from "../auth.js";
+import { storeToken, clearToken } from "../auth.js";
+import api from "../api/client.js";
 
 interface AuthContextValue {
   isAuthenticated: boolean;
-  role: string;        // "ADMIN" | "MANAGER" | "ASSISTANT_MANAGER" | "STAFF"
-  employeeId: string;  // JWT sub — used to scope portal requests
-  login: (sub: string, role: string) => Promise<void>;
+  role: string;
+  employeeId: string;
+  employeeName: string;
+  login: (email: string, password: string) => Promise<void>;
   logout: () => void;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  function initState() {
-    const payload = getStoredPayload();
-    if (!payload) return { isAuthenticated: false, role: "STAFF", employeeId: "" };
-    return { isAuthenticated: true, role: payload.role, employeeId: payload.sub };
-  }
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [role, setRole] = useState("STAFF");
+  const [employeeId, setEmployeeId] = useState("");
+  const [employeeName, setEmployeeName] = useState("");
 
-  const init = initState();
-  const [isAuthenticated, setIsAuthenticated] = useState(init.isAuthenticated);
-  const [role, setRole] = useState(init.role);
-  const [employeeId, setEmployeeId] = useState(init.employeeId);
-
-  async function login(sub: string, r: string) {
-    clearToken();
-    await mintAndStoreToken(sub, r);
+  async function login(email: string, password: string) {
+    const res = await api.post<{ success: true; data: { token: string; role: string; employeeId: string } }>(
+      "/auth/login",
+      { email, password }
+    );
+    const { token, role: r, employeeId: eid } = res.data.data;
+    storeToken(token);
     setIsAuthenticated(true);
     setRole(r);
-    setEmployeeId(sub);
+    setEmployeeId(eid);
+    // Fetch employee name
+    try {
+      const empRes = await api.get<{ success: true; data: { name: string } }>(`/employees/${eid}`);
+      setEmployeeName(empRes.data.data.name);
+    } catch {
+      setEmployeeName(email.split("@")[0] ?? "");
+    }
   }
 
   function logout() {
@@ -36,10 +43,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setIsAuthenticated(false);
     setRole("STAFF");
     setEmployeeId("");
+    setEmployeeName("");
   }
 
   return (
-    <AuthContext.Provider value={{ isAuthenticated, role, employeeId, login, logout }}>
+    <AuthContext.Provider value={{ isAuthenticated, role, employeeId, employeeName, login, logout }}>
       {children}
     </AuthContext.Provider>
   );

@@ -144,3 +144,94 @@ export const approveSwapRequest = (id: string, status: "APPROVED" | "DENIED", ma
       ...(managerNote && { managerNote }),
     })
     .then((r) => r.data.data);
+
+// ─── Phase 9: Auth ─────────────────────────────────────────────────────────────
+
+export const loginUser = (email: string, password: string) =>
+  api.post<{ success: true; data: { token: string; role: string; employeeId: string } }>("/auth/login", { email, password })
+    .then((r) => r.data.data);
+
+export const signupUser = (token: string, password: string, confirmPassword: string) =>
+  api.post<{ success: true; data: { token: string; role: string; employeeId: string; name: string } }>("/auth/signup", { token, password, confirmPassword })
+    .then((r) => r.data.data);
+
+export const fetchInviteInfo = (token: string) =>
+  api.get<{ success: true; data: { email: string; name: string } }>(`/auth/invite-info?token=${token}`)
+    .then((r) => r.data.data);
+
+export const resendInvite = (employeeId: string) =>
+  api.post(`/auth/resend-invite/${employeeId}`).then((r) => r.data);
+
+// ─── Phase 9: Budget ──────────────────────────────────────────────────────────
+
+export const fetchBudget = (weekStart: string) =>
+  api.get<{ success: true; data: import("./types.js").BudgetStatus }>(`/budget/${weekStart}`)
+    .then((r) => r.data.data);
+
+export const saveBudget = (weekStart: string, totalHoursBudget: number, notes?: string | null) =>
+  api.post<{ success: true; data: unknown }>("/budget", { weekStart, totalHoursBudget, notes })
+    .then((r) => r.data.data);
+
+// ─── Phase 9: Events ──────────────────────────────────────────────────────────
+
+export const fetchHistoricalEvents = (type?: string) => {
+  const qs = type ? `?type=${type}` : "";
+  return api.get<{ success: true; data: import("./types.js").HistoricalEvent[] }>(`/events/historical${qs}`)
+    .then((r) => r.data.data ?? []);
+};
+
+export const createHistoricalEvent = (body: {
+  name: string; event_type: string; date: string;
+  staff_used: number; hours_used: number; notes?: string | null;
+}) =>
+  api.post<{ success: true; data: import("./types.js").HistoricalEvent }>("/events/historical", body)
+    .then((r) => r.data.data);
+
+export const fetchUpcomingEvents = () =>
+  api.get<{ success: true; data: import("./types.js").UpcomingEvent[] }>("/events/upcoming")
+    .then((r) => r.data.data ?? []);
+
+export const fetchUpcomingEventsNext30Days = () =>
+  api.get<{ success: true; data: import("./types.js").UpcomingEvent[] }>("/events/upcoming/next30days")
+    .then((r) => r.data.data ?? []);
+
+export const createUpcomingEvent = (body: {
+  name: string; event_type: string; date: string;
+  confirmed_staff?: number | null; notes?: string | null;
+}) =>
+  api.post<{ success: true; data: import("./types.js").UpcomingEvent }>("/events/upcoming", body)
+    .then((r) => r.data.data);
+
+export const updateUpcomingEvent = (id: string, confirmed_staff: number | null, notes?: string | null) =>
+  api.put<{ success: true; data: import("./types.js").UpcomingEvent }>(`/events/upcoming/${id}`, { confirmed_staff, notes })
+    .then((r) => r.data.data);
+
+// ─── Phase 9: Salary ──────────────────────────────────────────────────────────
+
+export const fetchTeamPaySummary = (weekStart: string) =>
+  api.get<{ success: true; data: import("./types.js").TeamPaySummary }>(`/salary/team/${weekStart}`)
+    .then((r) => r.data.data);
+
+export const fetchEmployeePaySummary = (employeeId: string, weekStart: string) =>
+  api.get<{ success: true; data: import("./types.js").PaySummaryRow }>(`/salary/${employeeId}/${weekStart}`)
+    .then((r) => r.data.data);
+
+// ─── Phase 9: Company Config ──────────────────────────────────────────────────
+
+export const fetchCompanyConfig = () =>
+  api.get<{ success: true; data: import("./types.js").CompanyConfig }>("/config/company")
+    .then((r) => r.data.data);
+
+export const updateCompanyConfig = (body: { company_name?: string; currency?: string; timezone?: string }) =>
+  api.put<{ success: true; data: import("./types.js").CompanyConfig }>("/config/company", body)
+    .then((r) => r.data.data);
+
+export const uploadCompanyLogo = (imageBase64: string, mimeType?: string) =>
+  api.post<{ success: true; data: import("./types.js").CompanyConfig }>("/config/company/logo", { imageBase64, mimeType })
+    .then((r) => r.data.data);
+
+// ─── Phase 9: Avatar ──────────────────────────────────────────────────────────
+
+export const uploadAvatar = (imageBase64: string, mimeType?: string) =>
+  api.post<{ success: true; data: { avatar_url: string } }>("/portal/avatar", { imageBase64, mimeType })
+    .then((r) => r.data.data);

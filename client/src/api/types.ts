@@ -166,3 +166,76 @@ export interface PortalHoursSummary {
   targetHours: number;
   assignments: AssignmentWithDetails[];
 }
+
+// ─── Phase 9: Budget ──────────────────────────────────────────────────────────
+
+export interface BudgetStatus {
+  budget_hours: number | null;
+  scheduled_hours: number;
+  variance: number | null;
+  status: "UNDER" | "ON_TRACK" | "OVER" | "NO_BUDGET";
+  notes?: string | null;
+}
+
+// ─── Phase 9: Events ──────────────────────────────────────────────────────────
+
+export interface HistoricalEvent {
+  id: string;
+  name: string;
+  event_type: string;
+  date: string;
+  day_of_week: string;
+  staff_used: number;
+  hours_used: number;
+  notes: string | null;
+  created_at: string;
+}
+
+export interface UpcomingEvent {
+  id: string;
+  name: string;
+  event_type: string;
+  date: string;
+  recommended_staff: number | null;
+  recommended_hours: number | null;
+  confirmed_staff: number | null;
+  notes: string | null;
+}
+
+// ─── Phase 9: Salary ─────────────────────────────────────────────────────────
+
+export interface PaySummaryRow {
+  id: string;
+  employee_id: string;
+  week_start: string;
+  scheduled_hours: number;
+  absent_hours: number;
+  worked_hours: number;
+  hourly_rate: number;
+  gross_pay: number;
+  calculated_at: string;
+  employee: {
+    id: string;
+    name: string;
+    role: string;
+    management_tier: string;
+    hourly_rate: number | null;
+    currency: string;
+  };
+}
+
+export interface TeamPaySummary {
+  summaries: PaySummaryRow[];
+  team_total_gross: number;
+}
+
+// ─── Phase 9: Company Config ──────────────────────────────────────────────────
+
+export interface CompanyConfig {
+  id: string;
+  company_name: string;
+  logo_url: string | null;
+  currency: string;
+  timezone: string;
+  updated_at: string;
+}

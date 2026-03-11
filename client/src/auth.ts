@@ -1,50 +1,34 @@
 /**
- * Auth — JWT helpers.
- * Tokens are issued by the server so they are signed with the real JWT_SECRET.
+ * Auth — in-memory JWT storage.
+ * JWT is stored in module-level memory only (not localStorage).
+ * On page refresh the user must log in again.
  */
 
 import { decodeJwt } from "jose";
 
-const STORAGE_KEY = "schedule_dev_token";
+// In-memory token store — never persisted
+let _token: string | null = null;
 
-async function fetchServerToken(sub: string, role: string): Promise<string> {
-  const res = await fetch("/api/auth/token", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ sub, role }),
-  });
-  if (!res.ok) throw new Error("Failed to obtain auth token");
-  const { token } = (await res.json()) as { token: string };
-  return token;
+export function storeToken(token: string): void {
+  _token = token;
 }
 
-/** Fetches a server-signed token for the given identity and caches it in localStorage. */
-export async function mintAndStoreToken(sub: string, role: string): Promise<string> {
-  const token = await fetchServerToken(sub, role);
-  localStorage.setItem(STORAGE_KEY, token);
-  return token;
-}
-
-/** Returns the cached token (for API interceptor). Fetches from server if none exists. */
-export async function getToken(): Promise<string> {
-  const stored = localStorage.getItem(STORAGE_KEY);
-  if (stored) return stored;
-  return mintAndStoreToken("dev-admin", "ADMIN");
+export function getToken(): string | null {
+  return _token;
 }
 
 export function clearToken(): void {
-  localStorage.removeItem(STORAGE_KEY);
+  _token = null;
 }
 
-/** Decodes (does NOT verify) the stored token to extract payload. Returns null if absent/invalid. */
-export function getStoredPayload(): { sub: string; role: string } | null {
-  const token = localStorage.getItem(STORAGE_KEY);
-  if (!token) return null;
+export function getStoredPayload(): { sub: string; role: string; email?: string } | null {
+  if (!_token) return null;
   try {
-    const payload = decodeJwt(token);
+    const payload = decodeJwt(_token);
     return {
-      sub: (payload["sub"] as string) ?? "dev-admin",
-      role: (payload["role"] as string) ?? "ADMIN",
+      sub: (payload["sub"] as string) ?? "",
+      role: (payload["role"] as string) ?? "STAFF",
+      email: payload["email"] as string | undefined,
     };
   } catch {
     return null;

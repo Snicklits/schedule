@@ -1,6 +1,7 @@
 import "dotenv/config";
 import { PrismaClient } from "../generated/prisma/client.js";
 import { PrismaPg } from "@prisma/adapter-pg";
+import bcrypt from "bcrypt";
 
 const adapter = new PrismaPg({ connectionString: process.env["DATABASE_URL"]! });
 const prisma = new PrismaClient({ adapter });
@@ -498,10 +499,84 @@ async function main() {
 
   console.log(`✅  Created ScheduleConfig`);
 
+  // ── CompanyConfig ──────────────────────────────
+  await prisma.companyConfig.upsert({
+    where: { id: "default-config" },
+    update: {},
+    create: {
+      id: "default-config",
+      company_name: "My Company",
+      currency: "GBP",
+      timezone: "Europe/London",
+      updated_by: "system",
+    },
+  });
+  console.log(`✅  Created CompanyConfig`);
+
+  // ── UserAccounts ───────────────────────────────
+  // Create ACTIVE accounts with hashed passwords for each management tier
+  // Default password: "password123" for all seed accounts
+  const defaultPasswordHash = await bcrypt.hash("password123", 12);
+
+  await prisma.userAccount.upsert({
+    where: { employee_id: mgr1.id },
+    update: {},
+    create: {
+      employee_id: mgr1.id,
+      email: mgr1.email,
+      password_hash: defaultPasswordHash,
+      role: "MANAGER",
+      status: "ACTIVE",
+    },
+  });
+
+  await prisma.userAccount.upsert({
+    where: { employee_id: mgr2.id },
+    update: {},
+    create: {
+      employee_id: mgr2.id,
+      email: mgr2.email,
+      password_hash: defaultPasswordHash,
+      role: "MANAGER",
+      status: "ACTIVE",
+    },
+  });
+
+  await prisma.userAccount.upsert({
+    where: { employee_id: am1.id },
+    update: {},
+    create: {
+      employee_id: am1.id,
+      email: am1.email,
+      password_hash: defaultPasswordHash,
+      role: "ASSISTANT_MANAGER",
+      status: "ACTIVE",
+    },
+  });
+
+  await prisma.userAccount.upsert({
+    where: { employee_id: s1.id },
+    update: {},
+    create: {
+      employee_id: s1.id,
+      email: s1.email,
+      password_hash: defaultPasswordHash,
+      role: "STAFF",
+      status: "ACTIVE",
+    },
+  });
+
+  console.log(`✅  Created 4 UserAccounts (default password: password123)`);
+
   // ── Summary ───────────────────────────────────
   console.log();
   await printSummary();
   console.log("\n🎉  Seed complete!\n");
+  console.log("📝  Seed login credentials:");
+  console.log(`   Manager:   alice.hartman@store.com / password123`);
+  console.log(`   Manager:   brian.okafor@store.com / password123`);
+  console.log(`   Asst Mgr:  carmen.delgado@store.com / password123`);
+  console.log(`   Staff:     frank.rosario@store.com / password123`);
 }
 
 async function printSummary() {
