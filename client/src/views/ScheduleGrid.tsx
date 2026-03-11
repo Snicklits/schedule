@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
-import { fetchSchedule, fetchEmployees, reassignAssignment, fetchHoursSummary } from "../api/endpoints.js";
-import type { AssignmentWithDetails, Employee, ManagementTier, HoursSummaryRow } from "../api/types.js";
+import { fetchSchedule, fetchEmployees, reassignAssignment, fetchHoursSummary, fetchBudget, fetchUpcomingEventsNext30Days } from "../api/endpoints.js";
+import type { AssignmentWithDetails, Employee, ManagementTier, HoursSummaryRow, BudgetStatus, UpcomingEvent } from "../api/types.js";
 import { ErrorBanner } from "../components/ErrorBanner.js";
 import { Modal } from "../components/Modal.js";
 import { useToast } from "../contexts/ToastContext.js";
@@ -136,6 +136,8 @@ export function ScheduleGrid() {
   const [assignments, setAssignments] = useState<AssignmentWithDetails[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [hoursSummary, setHoursSummary] = useState<HoursSummaryRow[]>([]);
+  const [budget, setBudget] = useState<BudgetStatus | null>(null);
+  const [upcomingEvents, setUpcomingEvents] = useState<UpcomingEvent[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [drawer, setDrawer] = useState<DrawerState | null>(null);
@@ -148,11 +150,19 @@ export function ScheduleGrid() {
 
   const load = useCallback(() => {
     setLoading(true);
-    Promise.all([fetchSchedule(weekStart), fetchEmployees(), fetchHoursSummary(weekStart)])
-      .then(([asgn, emps, hours]) => {
+    Promise.all([
+      fetchSchedule(weekStart),
+      fetchEmployees(),
+      fetchHoursSummary(weekStart),
+      fetchBudget(weekStart).catch(() => null),
+      fetchUpcomingEventsNext30Days().catch(() => [] as UpcomingEvent[]),
+    ])
+      .then(([asgn, emps, hours, bud, events]) => {
         setAssignments(asgn);
         setEmployees(emps);
         setHoursSummary(hours);
+        setBudget(bud);
+        setUpcomingEvents(events as UpcomingEvent[]);
       })
       .catch((err: unknown) => {
         const e = err as { response?: { data?: { error?: { message?: string } } }; message?: string };
@@ -257,6 +267,60 @@ export function ScheduleGrid() {
           Refresh
         </button>
       </div>
+
+      {/* Budget bar */}
+      {budget && budget.status !== "NO_BUDGET" && budget.budget_hours !== null && (
+        <div className={`rounded-lg border p-4 ${budget.status === "OVER" ? "bg-red-50 border-red-200" : "bg-white border-gray-200"}`}>
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-sm font-medium text-gray-700">Weekly Labour Budget</span>
+            <span className={`text-sm font-semibold ${budget.status === "OVER" ? "text-red-600" : "text-green-600"}`}>
+              {budget.scheduled_hours.toFixed(1)} / {budget.budget_hours} hrs
+              {budget.status === "OVER" && <span className="ml-2 text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full">Over Budget</span>}
+            </span>
+          </div>
+          <div className="w-full bg-gray-100 rounded-full h-2.5 overflow-hidden">
+            <div
+              className={`h-2.5 rounded-full transition-all ${budget.status === "OVER" ? "bg-red-500" : "bg-green-500"}`}
+              style={{ width: `${Math.min(100, (budget.scheduled_hours / budget.budget_hours) * 100)}%` }}
+            />
+          </div>
+          {budget.status === "OVER" && (
+            <p className="mt-1.5 text-xs text-red-600 font-medium">
+              ⚠ {(budget.scheduled_hours - budget.budget_hours).toFixed(1)} hrs over budget this week
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Upcoming events */}
+      {upcomingEvents.length > 0 && (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {upcomingEvents.slice(0, 3).map((ev) => {
+            const staffDiff = ev.confirmed_staff !== null && ev.confirmed_staff !== undefined && ev.recommended_staff !== null && ev.recommended_staff !== undefined
+              ? ev.confirmed_staff - ev.recommended_staff
+              : null;
+            return (
+              <div key={ev.id} className="bg-white border border-gray-200 rounded-lg p-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <p className="text-xs font-semibold text-gray-800 truncate">{ev.name}</p>
+                    <p className="text-xs text-gray-500">{new Date(ev.date).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })}</p>
+                  </div>
+                  {staffDiff !== null && Math.abs(staffDiff) > 2 && (
+                    <span className="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full whitespace-nowrap">⚠ Staff</span>
+                  )}
+                </div>
+                {ev.recommended_staff !== null && (
+                  <p className="mt-1 text-xs text-gray-500">
+                    Rec: <strong>{ev.recommended_staff}</strong> staff
+                    {ev.confirmed_staff !== null && <> · Conf: <strong>{ev.confirmed_staff}</strong></>}
+                  </p>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* Specialty legend */}
       <div className="flex flex-wrap gap-2 text-xs">

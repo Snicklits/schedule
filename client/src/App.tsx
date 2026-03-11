@@ -21,6 +21,7 @@ import { PortalSchedule } from "./views/portal/PortalSchedule.js";
 import { PortalTimeOff } from "./views/portal/PortalTimeOff.js";
 import { PortalHours } from "./views/portal/PortalHours.js";
 import { PortalSwaps } from "./views/portal/PortalSwaps.js";
+import { PortalPay } from "./views/portal/PortalPay.js";
 
 const MANAGER_ROLES = new Set(["ADMIN", "MANAGER", "ASSISTANT_MANAGER"]);
 
@@ -67,6 +68,7 @@ function AppShell() {
           <Route path="/portal/schedule" element={<PortalSchedule />} />
           <Route path="/portal/time-off" element={<PortalTimeOff />} />
           <Route path="/portal/hours" element={<PortalHours />} />
+          <Route path="/portal/pay" element={<PortalPay />} />
           <Route path="/portal/swaps" element={<PortalSwaps />} />
           <Route path="*" element={<Navigate to="/portal/schedule" replace />} />
         </Routes>

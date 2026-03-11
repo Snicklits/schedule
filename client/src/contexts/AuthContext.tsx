@@ -7,6 +7,8 @@ interface AuthContextValue {
   role: string;
   employeeId: string;
   employeeName: string;
+  avatarUrl: string | null;
+  setAvatarUrl: (url: string) => void;
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
 }
@@ -18,6 +20,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [role, setRole] = useState("STAFF");
   const [employeeId, setEmployeeId] = useState("");
   const [employeeName, setEmployeeName] = useState("");
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
 
   async function login(email: string, password: string) {
     const res = await api.post<{ success: true; data: { token: string; role: string; employeeId: string } }>(
@@ -29,10 +32,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setIsAuthenticated(true);
     setRole(r);
     setEmployeeId(eid);
-    // Fetch employee name
+    // Fetch employee name and avatar
     try {
-      const empRes = await api.get<{ success: true; data: { name: string } }>(`/employees/${eid}`);
+      const empRes = await api.get<{ success: true; data: { name: string; avatar_url?: string | null } }>(`/employees/${eid}`);
       setEmployeeName(empRes.data.data.name);
+      setAvatarUrl(empRes.data.data.avatar_url ?? null);
     } catch {
       setEmployeeName(email.split("@")[0] ?? "");
     }
@@ -44,10 +48,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setRole("STAFF");
     setEmployeeId("");
     setEmployeeName("");
+    setAvatarUrl(null);
   }
 
   return (
-    <AuthContext.Provider value={{ isAuthenticated, role, employeeId, employeeName, login, logout }}>
+    <AuthContext.Provider value={{ isAuthenticated, role, employeeId, employeeName, avatarUrl, setAvatarUrl, login, logout }}>
       {children}
     </AuthContext.Provider>
   );
